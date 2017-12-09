@@ -283,24 +283,21 @@ class PeerConnectionManager {
 
 	public:
 
-		std::string adminPassword;		// set once allows admin access to setting tokens and streams.
+
+		std::map<std::string, std::string> tokenMap;		// token, stream_name		token is unique random string. stream_name is valid stream name/id
 
 
-		const std::map<std::string, std::string> tokenMap;		// token, stream_name		token is unique random string. stream_name is valid stream name
-
-
-		virtual bool hasToken(const std::string &stream_name, const std::string &token);
+		virtual bool hasToken(const std::string &token, const std::string &stream_name);
 		virtual bool isAdmin(const std::string &pwd);
 		virtual bool hasStream(const std::string &stream_name);
 
-		virtual const Json::Value adminAddStream(const std::string &stream_name, const std::string &url);
-		virtual const Json::Value adminRemoveStream(const std::string &stream_name);
-		virtual const Json::Value adminAddToken(const std::string &stream_name, const std::string &token);
-		virtual const Json::Value adminRemoveToken(const std::string &stream_name, const std::string &token);
-		virtual const Json::Value adminGetTokens();
-		virtual const Json::Value adminGetStreams(const std::string &stream_name);
+		virtual const Json::Value addStream(const std::string &stream_name, const std::string &url);
+		virtual const Json::Value removeStream(const std::string &stream_name);
+		virtual const Json::Value addToken(const std::string &stream_name, const std::string &token);
+		virtual const Json::Value removeToken(const std::string &stream_name, const std::string &token);
+		virtual const Json::Value getTokens();
+		virtual const Json::Value getStreams(const std::string &stream_name);
 		virtual const Json::Value error(const char * error);
-
 
 
 };

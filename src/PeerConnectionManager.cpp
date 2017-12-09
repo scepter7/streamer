@@ -17,7 +17,7 @@
 #include "media/engine/webrtcvideocapturerfactory.h"
 
 #include "PeerConnectionManager.h"
-#if !BHL
+#if USE_ALSA
 #include "V4l2AlsaMap.h"
 #endif
 
@@ -77,7 +77,7 @@ PeerConnectionManager::PeerConnectionManager(const std::string & stunurl, const 
 		}
 	}
 
-	#if !BHL
+	#if USE_ALSA
 	// build video audio map
 	m_videoaudiomap = getV4l2AlsaMap();
 	#endif
@@ -99,7 +99,7 @@ const Json::Value PeerConnectionManager::getMediaList()
 	std::cout << "PCM: getMediaList:" << std::endl;
 
 	Json::Value value(Json::arrayValue);
-#if !BHL
+#if USE_ALSA
 	std::unique_ptr<webrtc::VideoCaptureModule::DeviceInfo> info(webrtc::VideoCaptureFactory::CreateDeviceInfo());
 	if (info)
 	{
@@ -115,17 +115,16 @@ const Json::Value PeerConnectionManager::getMediaList()
 				RTC_LOG(INFO) << "video device name:" << name << " id:" << id;
 				Json::Value media;
 				media["video"] = name;
-#if !BHL
 				std::map<std::string,std::string>::iterator it = m_videoaudiomap.find(name);
 				if (it != m_videoaudiomap.end()) {
 					media["audio"] = it->second;
 				}
 				value.append(media);
-#endif
 			}
 		}
 	}
 #endif
+
 	for (auto url : urlList_)
 	{
 		Json::Value media;
@@ -143,7 +142,7 @@ const Json::Value PeerConnectionManager::getMediaList()
 const Json::Value PeerConnectionManager::getVideoDeviceList()
 {
 	Json::Value value(Json::arrayValue);
-#if !BHL
+#if USE_ALSA
 	std::unique_ptr<webrtc::VideoCaptureModule::DeviceInfo> info(webrtc::VideoCaptureFactory::CreateDeviceInfo());
 	if (info)
 	{
@@ -177,7 +176,7 @@ const Json::Value PeerConnectionManager::getVideoDeviceList()
 const Json::Value PeerConnectionManager::getAudioDeviceList()
 {
 	Json::Value value(Json::arrayValue);
-	#if !BHL
+	#if USE_ALSA
 	int16_t num_audioDevices = audioDeviceModule_->RecordingDevices();
 	RTC_LOG(INFO) << "nb audio devices:" << num_audioDevices;
 
@@ -749,7 +748,7 @@ rtc::scoped_refptr<webrtc::VideoTrackInterface> PeerConnectionManager::CreateVid
 	}
 	else
 	{
-#if !BHL
+#if USE_ALSA
 		std::unique_ptr<webrtc::VideoCaptureModule::DeviceInfo> info(webrtc::VideoCaptureFactory::CreateDeviceInfo());
 		if (info)
 		{
@@ -860,7 +859,7 @@ bool PeerConnectionManager::AddStreams(webrtc::PeerConnectionInterface* peer_con
 			if (video.find("rtsp://") == 0) {
 				audio = video;
 			} else {
-				#if !BHL
+				#if USE_ALSA
 				std::map<std::string,std::string>::iterator it = m_videoaudiomap.find(video);
 				if (it != m_videoaudiomap.end()) {
 					audio = it->second;
@@ -931,43 +930,28 @@ void PeerConnectionManager::PeerConnectionObserver::OnIceCandidate(const webrtc:
 	else
 	{
 		RTC_LOG(INFO) << sdp;
-
 		Json::Value jmessage;
 		jmessage[kCandidateSdpMidName] = candidate->sdp_mid();
 		jmessage[kCandidateSdpMlineIndexName] = candidate->sdp_mline_index();
 		jmessage[kCandidateSdpName] = sdp;
 		iceCandidateList_.append(jmessage);
 	}
-
-
-
 }
 
 
-
-
-
 	// BHL
-bool PeerConnectionManager::hasToken(const std::string &stream_name, const std::string &token)
+bool PeerConnectionManager::hasToken(const std::string &token, const std::string &stream_name)
  {
-/*
-	// TODO Implement
-	 std::string name = tokenMap.find(token);
-	 if (name!=NULL)
-	 {
-	 	if (name.equals(stream_name))
-		{
-			if (!hasStream(stream_name))
-			{
-				// cout warning.. stream should exist if checking token.
-				return false;
-			}
-			return true;		//
-	 	}
-	}
+	 bool has = hasStream(stream_name);
+	 assert(has);
 
-		*/
-		return false;
+	 std::map<std::string,std::string>::iterator it = tokenMap.find(token);
+	 if (it != tokenMap.end())
+	 {
+		 	if (has && stream_name.compare(it->second)==0)
+				return true;
+	 }
+	 return false;
  }
 
  bool PeerConnectionManager::isAdmin(const std::string &pwd)
@@ -978,9 +962,9 @@ bool PeerConnectionManager::hasToken(const std::string &stream_name, const std::
 
  bool PeerConnectionManager::hasStream(const std::string &stream_name)
 {
-	return false;
-
-	// TODO: return urlList_.find(stream_name) != NULL;
+	int count = urlList_.count(stream_name);
+	assert(count == 1 || count ==0);
+	return count >0;
 }
 
 const Json::Value PeerConnectionManager::error(const char *err)
@@ -991,7 +975,7 @@ const Json::Value PeerConnectionManager::error(const char *err)
 	return value;
 }
 
-const Json::Value PeerConnectionManager::adminAddStream(const std::string &stream_name, const std::string &url)
+const Json::Value PeerConnectionManager::addStream(const std::string &stream_name, const std::string &url)
 {
 	Json::Value value(Json::arrayValue);
 	if (hasStream(stream_name))
@@ -1002,33 +986,33 @@ const Json::Value PeerConnectionManager::adminAddStream(const std::string &strea
 
 	return value;
 }
-const Json::Value PeerConnectionManager::adminRemoveStream(const std::string &stream_name)
+const Json::Value PeerConnectionManager::removeStream(const std::string &stream_name)
 {
 	Json::Value value(Json::arrayValue);
 	return value;
 }
 
 
-const Json::Value PeerConnectionManager::adminAddToken(const std::string &stream_name, const std::string &token)
+const Json::Value PeerConnectionManager::addToken(const std::string &stream_name, const std::string &token)
 {
 	Json::Value value(Json::arrayValue);
 	return value;
 }
 
 
-const Json::Value PeerConnectionManager::adminRemoveToken(const std::string &stream_name, const std::string &token)
+const Json::Value PeerConnectionManager::removeToken(const std::string &stream_name, const std::string &token)
 {
 	Json::Value value(Json::arrayValue);
 	return value;
 }
 
-const Json::Value PeerConnectionManager::adminGetTokens()
+const Json::Value PeerConnectionManager::getTokens()
 {
 	Json::Value value(Json::arrayValue);
 	return value;
 }
 
-const Json::Value PeerConnectionManager::adminGetStreams(const std::string &stream_name)
+const Json::Value PeerConnectionManager::getStreams(const std::string &stream_name)
 {
 	Json::Value value(Json::arrayValue);
 	return value;

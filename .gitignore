@@ -1,4 +1,5 @@
 src/*.o
 *.a
 *.tgz
-webrtc-streamer
+
+.remote-sync.json

@@ -1,4 +1,4 @@
-CC=$(CROSS)gcc 
+CC=$(CROSS)gcc
 CXX=$(CROSS)g++
 AR=$(CROSS)ar
 SYSROOT?=$(shell $(CC) -print-sysroot)
@@ -19,6 +19,7 @@ VERSION+=webrtc@$(shell git -C $(WEBRTCROOT)/src describe --tags --always --dirt
 WEBRTCLIBPATH=$(WEBRTCROOT)/src/$(GYP_GENERATOR_OUTPUT)/out/$(WEBRTCBUILD)
 
 CFLAGS += -DWEBRTC_POSIX -fno-rtti -DHAVE_JPEG
+CFLAGS += -DBHL=1 -DUSE_ALSA=0
 CFLAGS += -I $(WEBRTCROOT)/src -I $(WEBRTCROOT)/src/third_party/jsoncpp/source/include -I $(WEBRTCROOT)/src/third_party/libyuv/include
 #detect debug vs release
 TESTDEBUG=$(shell nm $(wildcard $(WEBRTCLIBPATH)/obj/rtc_base/librtc_base_generic.a) | c++filt | grep std::__debug::vector >/dev/null && echo debug)
@@ -27,7 +28,7 @@ ifeq ($(TESTDEBUG),debug)
 else
 	CFLAGS +=-DNDEBUG=1
 endif
-LDFLAGS += -ldl -lrt 
+LDFLAGS += -ldl -lrt
 
 WEBRTC_LIB += $(shell find $(WEBRTCLIBPATH)/obj -name '*.o')
 LIBS+=libWebRTC_$(GYP_GENERATOR_OUTPUT)_$(WEBRTCBUILD).a
@@ -38,7 +39,7 @@ libWebRTC_$(GYP_GENERATOR_OUTPUT)_$(WEBRTCBUILD).a: $(WEBRTC_LIB)
 ifneq ($(wildcard $(SYSROOT)$(PREFIX)/include/alsa/asoundlib.h),)
 CFLAGS += -DHAVE_ALSA -I $(SYSROOT)$(PREFIX)/include
 LDFLAGS+= -L $(SYSROOT)$(PREFIX)/lib -lasound
-else	
+else
 $(info ALSA not found in $(SYSROOT)$(PREFIX)/include)
 endif
 
@@ -59,8 +60,8 @@ CFLAGS += -I live555helper/inc
 CFLAGS += -I $(SYSROOT)$(PREFIX)/include/liveMedia  -I $(SYSROOT)$(PREFIX)/include/groupsock -I $(SYSROOT)$(PREFIX)/include/UsageEnvironment -I $(SYSROOT)$(PREFIX)/include/BasicUsageEnvironment/
 
 LDFLAGS += live555helper/live555helper.a
-LDFLAGS += -L $(SYSROOT)$(PREFIX)/lib -l:libliveMedia.a -l:libgroupsock.a -l:libUsageEnvironment.a -l:libBasicUsageEnvironment.a 
-else	
+LDFLAGS += -L $(SYSROOT)$(PREFIX)/lib -l:libliveMedia.a -l:libgroupsock.a -l:libUsageEnvironment.a -l:libBasicUsageEnvironment.a
+else
 $(info LIVE555 not found in $(SYSROOT)$(PREFIX)/include)
 endif
 
@@ -80,12 +81,12 @@ LDFLAGS += -L civetweb -l civetweb
 VERSION+=h264bitstream@$(shell git -C h264bitstream describe --tags --always --dirty)
 LIBS+=h264bitstream/.libs/libh264bitstream.a
 h264bitstream/Makefile:
-	git submodule update --init h264bitstream	
+	git submodule update --init h264bitstream
 
 h264bitstream/.libs/libh264bitstream.a: h264bitstream/Makefile
 	cd h264bitstream && autoreconf -i -f
 	cd h264bitstream && CC=$(CXX) ./configure --host=$(shell $(CXX) -dumpmachine)
-	make -C h264bitstream 
+	make -C h264bitstream
 
 CFLAGS += -I h264bitstream
 LDFLAGS += h264bitstream/.libs/libh264bitstream.a
@@ -94,7 +95,7 @@ src/%.o: src/%.cpp $(LIBS)
 	$(CXX) -o $@ -c $< $(CFLAGS) -DVERSION="\"$(VERSION)\""
 
 FILES = $(wildcard src/*.cpp)
-$(TARGET): $(subst .cpp,.o,$(FILES)) $(LIBS) 
+$(TARGET): $(subst .cpp,.o,$(FILES)) $(LIBS)
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 clean:

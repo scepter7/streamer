@@ -93,18 +93,39 @@ class RequestHandler : public CivetHandler
 };
 
 
-int log_message(const struct mg_connection *conn, const char *message) 
+int log_message(const struct mg_connection *conn, const char *message)
 {
 	fprintf(stderr, "%s\n", message);
 	return 0;
 }
 
 static struct CivetCallbacks _callbacks;
-const struct CivetCallbacks * getCivetCallbacks() 
+const struct CivetCallbacks * getCivetCallbacks()
 {
 	memset(&_callbacks, 0, sizeof(_callbacks));
 	_callbacks.log_message = &log_message;
 	return &_callbacks;
+}
+
+bool HttpServerRequestHandler::isAdmin(const struct mg_request_info *req_info)
+{
+  if (req_info)
+  {
+    return true;
+  }
+  return false;
+}
+
+const Json::Value HttpServerRequestHandler::unauthorized()
+{
+  std::string msg("unauthorized");
+  return error(msg);
+}
+
+const Json::Value HttpServerRequestHandler::error(std::string &msg)
+{
+  const Json::Value error;
+  return error;
 }
 
 /* ---------------------------------------------------------------------------
@@ -117,7 +138,7 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 	m_func["/getMediaList"]          = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
 		return m_webRtcServer->getMediaList();
 	};
-	
+
 	m_func["/getVideoDeviceList"]    = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
 		return m_webRtcServer->getVideoDeviceList();
 	};
@@ -195,9 +216,55 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 		return m_webRtcServer->getPeerConnectionList();
 	};
 
+
+  // TODO: Fix .. uncommenting gives compile error.
 	m_func["/getStreamList"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
 		return m_webRtcServer->getStreamList();
 	};
+
+
+  m_func["/adminAddStream"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+    std::string stream_name, url;
+    if (!isAdmin(req_info)) return unauthorized();
+      CivetServer::getParam(req_info->query_string, "stream_name", stream_name);
+      CivetServer::getParam(req_info->query_string, "url", url);
+    return m_webRtcServer->addStream(stream_name, url);
+  };
+
+  m_func["/adminRemoveStream"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+    std::string stream_name;
+    if (req_info->query_string) {
+      CivetServer::getParam(req_info->query_string, "stream_name", stream_name);
+        }
+
+    return m_webRtcServer->removeStream(stream_name);
+  };
+
+  m_func["/adminAddToken"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+    std::string stream_name, token;
+
+    if (!isAdmin(req_info)) return unauthorized();
+    CivetServer::getParam(req_info->query_string, "stream_name", stream_name);
+    CivetServer::getParam(req_info->query_string, "token", token);
+    return m_webRtcServer->addToken(stream_name, token);
+
+
+  };
+  m_func["/adminRemoveToken"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+    std::string stream_name, token;
+    if (!isAdmin(req_info)) return unauthorized();
+      CivetServer::getParam(req_info->query_string, "stream_name", stream_name);
+      CivetServer::getParam(req_info->query_string, "token", token);
+      return m_webRtcServer->removeToken(stream_name, token);
+  };
+
+  m_func["/adminGetTokens"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+    if (!isAdmin(req_info)) return unauthorized();
+    return m_webRtcServer->getTokens();
+  };
+
+
+
 
 	m_func["/help"]                  = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
 		Json::Value answer;
@@ -241,4 +308,3 @@ httpFunction HttpServerRequestHandler::getFunction(const std::string& uri)
 
 	return fct;
 }
-

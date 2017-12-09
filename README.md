@@ -1,13 +1,13 @@
-[![Build status](https://travis-ci.org/mpromonet/webrtc-streamer.png)](https://travis-ci.org/mpromonet/webrtc-streamer)
-
-[![Release](https://img.shields.io/github/release/mpromonet/webrtc-streamer.svg)](https://github.com/mpromonet/webrtc-streamer/releases/latest)
-[![Download](https://img.shields.io/github/downloads/mpromonet/webrtc-streamer/total.svg)](https://github.com/mpromonet/webrtc-streamer/releases/latest)
-[![Docker Pulls](https://img.shields.io/docker/pulls/mpromonet/webrtc-streamer.svg)](https://hub.docker.com/r/mpromonet/webrtc-streamer/)
-
-[![Heroku](https://heroku-badge.herokuapp.com/?app=webrtc-streamer)](https://webrtc-streamer.herokuapp.com/)
-
-WebRTC-streamer
+streamer
 ===============
+H.264 RTSP to WebRTC server based on a fork of [WebRTC-streamer](https://github.com/mpromonet/webrtc-streamer). In progress!
+
+Adding API calls for:
+  Manage tokens for security access to streams
+  Add/Delete h.264 RTSP streams
+
+The rest of this document is from the original author.
+
 
 This is a try to stream video sources through WebRTC using simple mechanism.  
 
@@ -23,7 +23,8 @@ The WebRTC signaling is implemented throught HTTP requests:
 
 The list of HTTP API is available using /help.
 
-Nowdays there is 3 builds on [Travis CI](https://travis-ci.org/mpromonet/webrtc-streamer) :
+
+There are 3 builds on [Travis CI](https://travis-ci.org/mpromonet/webrtc-streamer) :
  * for x86_64 on Ubuntu Xenial
  * for armv7 crosscompiling with gcc-linaro-arm-linux-gnueabihf-raspbian-x64 (this build is running on Raspberry Pi2 and NanoPi NEO)
  * for armv6+vfp crosscompiling with gcc-linaro-arm-linux-gnueabihf-raspbian-x64 (this build is running on Raspberry PiB and should run on a Raspberry Zero)
@@ -54,11 +55,11 @@ Build live555 to enable RTSP support(optional)
 	make SYSROOT=<path to WebRTC>/src/build/linux/debian_stretch_amd64-sysroot live555
 
 Build WebRTC Streamer
-------- 
+-------
 	make WEBRTCROOT=<path to WebRTC> WEBRTCBUILD=<Release or Debug> SYSROOT=<path to WebRTC>/src/build/linux/debian_stretch_amd64-sysroot
-	
+
 where WEBRTCROOT and WEBRTCBUILD indicate how to point to WebRTC :
- - $WEBRTCROOT/src should contains source (default is ../webrtc) 
+ - $WEBRTCROOT/src should contains source (default is ../webrtc)
  - $WEBRTCROOT/src/out/$WEBRTCBUILD should contains libraries (default is Release)
  - $SYSROOT should point to sysroot used to build WebRTC (default is /)
 
@@ -71,7 +72,7 @@ Usage
          	-S[stun_address]   : start embeded STUN server bind to address (default 0.0.0.0:3478)
          	-s[stun_address]   : use an external STUN server (default stun.l.google.com:19302)
                 -t[username:password@]turn_address : use an external TURN relay server (default disabled)		
-                -a[audio layer]    : spefify audio capture layer to use (default:3)		
+                -a[audio layer]    : specify audio capture layer to use (default:3)		
          	[url]              : url to register in the source list
         	-v[v[v]]           : verbosity
         	-V                 : print version
@@ -111,7 +112,7 @@ A short sample using webrtc-streamer running locally on port 8000 :
 	    window.onbeforeunload = function() { webRtcServer.disconnect() }
 	</script>
 	</head>
-	<body> 
+	<body>
 	    <video id="video" />
 	</body>
 	</html>
@@ -143,7 +144,7 @@ This way the communication between [Janus API](https://janus.conf.meetecho.com/d
 The same logic could be implemented in NodeJS using the same JS API :
 
 	var request = require('then-request');
-	var JanusVideoRoom = require('./html/janusvideoroom.js'); 
+	var JanusVideoRoom = require('./html/janusvideoroom.js');
 	var janus = new JanusVideoRoom("http://192.168.0.15:8088/janus", "http://192.168.0.15:8000", request)
 	janus.join(1234,"mmal service 16.1","video")
 
@@ -163,6 +164,3 @@ The container accept arguments that are forward to webrtc-streamer application, 
 * expose the V4L2 device /dev/video0 using :
 
         docker run --device=/dev/video0 -p 8000:8000 -it mpromonet/webrtc-streamer
-
-
-

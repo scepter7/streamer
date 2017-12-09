@@ -41,7 +41,7 @@ class RTSPVideoCapturer : public cricket::VideoCapturer, public RTSPConnection::
                 }
                 virtual void    onError(RTSPConnection& connection,const char* erro)       {
                         connection.start();
-                }		
+                }
 
 		// overide webrtc::DecodedImageCallback
 		virtual int32_t Decoded(webrtc::VideoFrame& decodedImage);
@@ -81,7 +81,7 @@ class RTSPAudioSource : public webrtc::Notifier<webrtc::AudioSourceInterface>, p
 
 		SourceState state() const override { return kLive; }
 		bool remote() const override { return true; }
-		
+
 		void AddSink(webrtc::AudioTrackSinkInterface* sink) override {
 			RTC_LOG(INFO) << "RTSPAudioSource::AddSink ";
 			m_sink = sink;
@@ -90,17 +90,17 @@ class RTSPAudioSource : public webrtc::Notifier<webrtc::AudioSourceInterface>, p
 			RTC_LOG(INFO) << "RTSPAudioSource::RemoveSink ";
 			m_sink = NULL;
 		}
-		
+
 		// overide rtc::Thread
-		virtual void Run() { m_env.mainloop(); } 		
+		virtual void Run() { m_env.mainloop(); }
 
 		// overide RTSPConnection::Callback
 		virtual bool onNewSession(const char* id, const char* media, const char* codec, const char* sdp) {
-			
+
 			bool success = false;
-			if (strcmp(media, "audio") == 0) {								
+			if (strcmp(media, "audio") == 0) {
 				RTC_LOG(INFO) << "RTSPAudioSource::onNewSession " << media << "/" << codec << " " << sdp;
-				
+
 				// parse sdp to extract freq and channel
 				std::string fmt(sdp);
 				size_t pos = fmt.find(codec);
@@ -122,13 +122,13 @@ class RTSPAudioSource : public webrtc::Notifier<webrtc::AudioSourceInterface>, p
 					}
 				}
 				RTC_LOG(INFO) << "RTSPAudioSource::onNewSession freq:" << m_freq << " channel:" << m_channel;
-				
-				if (strcmp(codec, "PCMU") == 0) 
+
+				if (strcmp(codec, "PCMU") == 0)
 				{
 					m_decoder = m_factory->MakeAudioDecoder(webrtc::SdpAudioFormat(codec, m_freq, m_channel));
 					success = true;
 				}
-				else if (strcmp(codec, "OPUS") == 0) 
+				else if (strcmp(codec, "OPUS") == 0)
 				{
 					m_decoder = m_factory->MakeAudioDecoder(webrtc::SdpAudioFormat(codec, m_freq, m_channel));
 					success = true;
@@ -139,14 +139,14 @@ class RTSPAudioSource : public webrtc::Notifier<webrtc::AudioSourceInterface>, p
 					success = true;
 				}
 			}
-			return success;			
+			return success;
 		}
-		
+
 		virtual bool onData(const char* id, unsigned char* buffer, ssize_t size, struct timeval presentationTime) {
 			bool success = false;
 			int segmentLength = m_freq/100;
-			if (m_sink) {								
-				if (m_decoder.get() != NULL) {				
+			if (m_sink) {
+				if (m_decoder.get() != NULL) {
 					int16_t decoded[size];
 					webrtc::AudioDecoder::SpeechType speech_type;
 					int res = m_decoder->Decode(buffer, size, m_freq, sizeof(decoded), decoded, &speech_type);
@@ -157,8 +157,8 @@ class RTSPAudioSource : public webrtc::Notifier<webrtc::AudioSourceInterface>, p
 						}
 					} else {
 						RTC_LOG(LS_ERROR) << "RTSPAudioSource::onData error:Decode Audio failed";
-					}																
-					while (m_buffer.size() > segmentLength*m_channel) {
+					}
+					while (m_buffer.size() > (unsigned int) segmentLength*m_channel) {
 						int16_t outbuffer[segmentLength*m_channel];
 						for (int i=0; i<segmentLength*m_channel; ++i) {
 							uint16_t value = m_buffer.front();
@@ -184,7 +184,7 @@ class RTSPAudioSource : public webrtc::Notifier<webrtc::AudioSourceInterface>, p
 
 	private:
 		Environment                             m_env;
-		RTSPConnection                          m_connection; 
+		RTSPConnection                          m_connection;
 		rtc::scoped_refptr<webrtc::AudioDecoderFactory> m_factory;
 		std::unique_ptr<webrtc::AudioDecoder>   m_decoder;
 		webrtc::AudioTrackSinkInterface*        m_sink;
@@ -195,4 +195,3 @@ class RTSPAudioSource : public webrtc::Notifier<webrtc::AudioSourceInterface>, p
 
 
 #endif
-

@@ -29,7 +29,15 @@ int main(int argc, char* argv[])
 	int logLevel              = rtc::LERROR;	// bhl rtc::LERROR, LS_VERBOSE;
 	const char* webroot       = "./html";
 	std::string sslCertificate;
+
+#if USE_ALSA
 	webrtc::AudioDeviceModule::AudioLayer audioLayer = webrtc::AudioDeviceModule::kLinuxAlsaAudio;
+#else
+	webrtc::AudioDeviceModule::AudioLayer audioLayer = webrtc::AudioDeviceModule::kDummyAudio;
+#endif
+
+	std::string apiPrefix="streamer_api/";
+
 	std::string streamName;
 	std::map<std::string,std::string> urlList;
 
@@ -54,8 +62,9 @@ int main(int argc, char* argv[])
 			case 't': turnurl = optarg; break;
 			case 'S': localstunurl = optarg ? optarg : defaultlocalstunurl; stunurl = localstunurl; break;
 			case 's': localstunurl = NULL; if (optarg) stunurl = optarg; break;
-
-			// case 'a': audioLayer = optarg ? (webrtc::AudioDeviceModule::AudioLayer)atoi(optarg) : webrtc::AudioDeviceModule::kDummyAudio; break;
+#if USE_ALSA
+			case 'a': audioLayer = optarg ? (webrtc::AudioDeviceModule::AudioLayer)atoi(optarg) : webrtc::AudioDeviceModule::kDummyAudio; break;
+#endif
 			case 'n': streamName = optarg; break;
 			case 'u': {
 				if (!streamName.empty()) {
@@ -98,6 +107,7 @@ int main(int argc, char* argv[])
 				exit(0);
 		}
 	}
+
 	int urls=0;
 	while (optind<argc)
 	{
@@ -106,13 +116,14 @@ int main(int argc, char* argv[])
 		optind++;
 		urls++;
 	}
+
+	// Testing. TODO: Take out when working with back-end
 	if (urls==0)
 	{
 		std::string def("rtsp://video:only@bhlowe.com/cam/realmonitor?channel=1&subtype=1");
-		std::string key("Ranch_1");
+		std::string key("Ranch");
 		urlList[key]=def;
 	}
-
 
 	rtc::LogMessage::LogToDebug((rtc::LoggingSeverity)logLevel);
 	rtc::LogMessage::LogTimestamps();

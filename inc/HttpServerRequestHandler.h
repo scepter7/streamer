@@ -4,7 +4,7 @@
 ** any purpose.
 **
 ** HttpServerHandler.h
-** 
+**
 ** -------------------------------------------------------------------------*/
 
 #include "CivetServer.h"
@@ -18,11 +18,16 @@ typedef std::function<Json::Value(const struct mg_request_info *, const Json::Va
 class HttpServerRequestHandler : public CivetServer
 {
 	public:
-		HttpServerRequestHandler(PeerConnectionManager* webRtcServer, const std::vector<std::string>& options); 
-	
+		HttpServerRequestHandler(PeerConnectionManager* webRtcServer, const std::vector<std::string>& options);
+
 		httpFunction getFunction(const std::string& uri);
-				
+
+
 	protected:
 		PeerConnectionManager* m_webRtcServer;
 		std::map<std::string,httpFunction> m_func;
+		bool isAdmin(const struct mg_request_info *req_info);
+		const Json::Value unauthorized();
+		const Json::Value error(std::string &error);
+
 };

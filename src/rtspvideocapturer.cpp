@@ -22,7 +22,7 @@
 
 uint8_t marker[] = { 0, 0, 0, 1};
 
-int decodeRTPTransport(const std::string & rtpTransportString) 
+int decodeRTPTransport(const std::string & rtpTransportString)
 {
 	int rtptransport = RTSPConnection::RTPUDPUNICAST;
 	if (rtpTransportString == "tcp") {
@@ -49,9 +49,9 @@ RTSPVideoCapturer::~RTSPVideoCapturer()
 bool RTSPVideoCapturer::onNewSession(const char* id,const char* media, const char* codec, const char* sdp)
 {
 	bool success = false;
-	if (strcmp(media, "video") == 0) {	
+	if (strcmp(media, "video") == 0) {
 		RTC_LOG(INFO) << "RTSPVideoCapturer::onNewSession " << media << "/" << codec << " " << sdp;
-		
+
 		if (strcmp(codec, "H264") == 0)
 		{
 			m_codec = codec;
@@ -88,7 +88,7 @@ bool RTSPVideoCapturer::onNewSession(const char* id,const char* media, const cha
 			}
 			success = true;
 		}
-		else if (strcmp(codec, "JPEG") == 0) 
+		else if (strcmp(codec, "JPEG") == 0)
 		{
 			m_codec = codec;
 			success = true;
@@ -150,7 +150,7 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 				m_cfg.insert(m_cfg.end(), buffer, buffer+size);
 				break;
 			case NAL_UNIT_TYPE_AUD:
-			case NAL_UNIT_TYPE_SEI:
+			case NAL_UNIT_TYPE_SEI:	// these two nal units were causing warnings downstream in the webrtc Decoder code. Safe to ignore?
 				break;
 			case NAL_UNIT_TYPE_CODED_SLICE_IDR:
 				if (m_decoder.get()) {
@@ -163,7 +163,7 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 					res = m_decoder->Decode(input_image, false, NULL);
 				} else 	{
 					RTC_LOG(LS_ERROR) << "RTSPVideoCapturer:onData no decoder";
-					res = -1;	
+					res = -1;
 				}
 				break;
 			default:
@@ -174,9 +174,9 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 					res = m_decoder->Decode(input_image, false, NULL);
 				}else 	{
 					RTC_LOG(LS_ERROR) << "RTSPVideoCapturer:onData no decoder";
-					res = -1;	
+					res = -1;
 				}
-				
+
 		}
 
 	} else if (m_codec == "JPEG") {
@@ -185,7 +185,7 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 		if (libyuv::MJPGSize(buffer, size, &width, &height) == 0) {
 			int stride_y = width;
 			int stride_uv = (width + 1) / 2;
-					
+
 			rtc::scoped_refptr<webrtc::I420Buffer> I420buffer = webrtc::I420Buffer::Create(width, height, stride_y, stride_uv, stride_uv);
 			const int conversionResult = libyuv::ConvertToI420((const uint8*)buffer, size,
 							(uint8*)I420buffer->DataY(), I420buffer->StrideY(),
@@ -194,8 +194,8 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 							0, 0,
 							width, height,
 							width, height,
-							libyuv::kRotate0, ::libyuv::FOURCC_MJPG);									
-									
+							libyuv::kRotate0, ::libyuv::FOURCC_MJPG);
+
 			if (conversionResult >= 0) {
 				webrtc::VideoFrame frame(I420buffer, 0, ts*1000, webrtc::kVideoRotation_0);
 				this->Decoded(frame);
@@ -207,7 +207,7 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 			RTC_LOG(LS_ERROR) << "RTSPVideoCapturer:onData cannot JPEG dimension";
 			res = -1;
 		}
-			    
+
 	}
 
 	return (res == 0);
