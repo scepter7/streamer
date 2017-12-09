@@ -10,6 +10,8 @@
 #ifndef PEERCONNECTIONMANAGER_H_
 #define PEERCONNECTIONMANAGER_H_
 
+#define BHL 1
+
 #include <string>
 
 #include "api/peerconnectioninterface.h"
@@ -22,6 +24,9 @@
 
 
 class PeerConnectionManager {
+
+
+
 	class VideoSink : public rtc::VideoSinkInterface<webrtc::VideoFrame> {
 		public:
 			VideoSink(webrtc::VideoTrackInterface* track): m_track(track) {
@@ -31,7 +36,7 @@ class PeerConnectionManager {
 			virtual ~VideoSink() {
 				RTC_LOG(LS_ERROR) << __PRETTY_FUNCTION__ << " track:" << m_track->id();
 				m_track->RemoveSink(this);
-			}		
+			}
 
 			// VideoSinkInterface implementation
 			virtual void OnFrame(const webrtc::VideoFrame& video_frame) {
@@ -42,7 +47,7 @@ class PeerConnectionManager {
 		protected:
 			rtc::scoped_refptr<webrtc::VideoTrackInterface> m_track;
 	};
-	
+
 	class SetSessionDescriptionObserver : public webrtc::SetSessionDescriptionObserver {
 		public:
 			static SetSessionDescriptionObserver* Create(webrtc::PeerConnectionInterface* pc)
@@ -121,7 +126,7 @@ class PeerConnectionManager {
 		public:
 			DataChannelObserver(rtc::scoped_refptr<webrtc::DataChannelInterface> dataChannel): m_dataChannel(dataChannel) {
 				m_dataChannel->RegisterObserver(this);
-			
+
 			}
 			virtual ~DataChannelObserver() {
 				m_dataChannel->UnregisterObserver();
@@ -158,7 +163,7 @@ class PeerConnectionManager {
 							    this);
 
 				m_statsCallback = new rtc::RefCountedObject<PeerConnectionStatsCollectorCallback>();
-				
+
 				rtc::scoped_refptr<webrtc::DataChannelInterface>   channel = m_pc->CreateDataChannel("ServerDataChannel", NULL);
 				m_localChannel = new DataChannelObserver(channel);
 			};
@@ -171,7 +176,7 @@ class PeerConnectionManager {
 			}
 
 			Json::Value getIceCandidateList() { return iceCandidateList_; 	}
-			
+
 			Json::Value getStats() {
 				m_statsCallback->clearReport();
 				m_pc->GetStats(m_statsCallback);
@@ -189,7 +194,7 @@ class PeerConnectionManager {
 			virtual void OnAddStream(rtc::scoped_refptr<webrtc::MediaStreamInterface> stream)    {
 				RTC_LOG(LERROR) << __PRETTY_FUNCTION__ << " nb video tracks:" << stream->GetVideoTracks().size();
 				webrtc::VideoTrackVector videoTracks = stream->GetVideoTracks();
-				if (videoTracks.size()>0) {					
+				if (videoTracks.size()>0) {
 					m_videosink.reset(new VideoSink(videoTracks.at(0)));
 				}
 			}
@@ -205,9 +210,9 @@ class PeerConnectionManager {
 			}
 
 			virtual void OnIceCandidate(const webrtc::IceCandidateInterface* candidate);
-			
+
 			virtual void OnSignalingChange(webrtc::PeerConnectionInterface::SignalingState state) {
-				RTC_LOG(LERROR) << __PRETTY_FUNCTION__ << " state:" << state << " peerid:" << m_peerid;				
+				RTC_LOG(LERROR) << __PRETTY_FUNCTION__ << " state:" << state << " peerid:" << m_peerid;
 			}
 			virtual void OnIceConnectionChange(webrtc::PeerConnectionInterface::IceConnectionState state) {
 				RTC_LOG(INFO) << __PRETTY_FUNCTION__ << " state:" << state  << " peerid:" << m_peerid;
@@ -218,7 +223,7 @@ class PeerConnectionManager {
 					m_peerConnectionManager->hangUp(m_peerid);
 				}
 			}
-			
+
 			virtual void OnIceGatheringChange(webrtc::PeerConnectionInterface::IceGatheringState) {
 			}
 
@@ -240,16 +245,18 @@ class PeerConnectionManager {
 
 		bool InitializePeerConnection();
 
-		const Json::Value getIceCandidateList(const std::string &peerid);
-		const Json::Value addIceCandidate(const std::string &peerid, const Json::Value& jmessage);
-		const Json::Value getVideoDeviceList();
-		const Json::Value getAudioDeviceList();
-		const Json::Value getMediaList();
-		const Json::Value hangUp(const std::string &peerid);
-		const Json::Value call(const std::string &peerid, const std::string & videourl, const std::string & audiourl, const std::string & options, const Json::Value& jmessage);
-		const Json::Value getIceServers(const std::string& clientIp);
-		const Json::Value getPeerConnectionList();
-		const Json::Value getStreamList();
+		virtual const Json::Value getIceCandidateList(const std::string &peerid);
+		virtual const Json::Value addIceCandidate(const std::string &peerid, const Json::Value& jmessage);
+		virtual const Json::Value getVideoDeviceList();
+		virtual const Json::Value getAudioDeviceList();
+		virtual const Json::Value getMediaList();
+		virtual const Json::Value hangUp(const std::string &peerid);
+		virtual const Json::Value call(const std::string &peerid, const std::string & videourl, const std::string & audiourl, const std::string & options, const Json::Value& jmessage);
+		virtual const Json::Value getIceServers(const std::string& clientIp);
+		virtual const Json::Value getPeerConnectionList();
+		virtual const Json::Value getStreamList();
+
+
 		const Json::Value createOffer(const std::string &peerid, const std::string & videourl, const std::string & audiourl, const std::string & options);
 		void              setAnswer(const std::string &peerid, const Json::Value& jmessage);
 
@@ -273,6 +280,29 @@ class PeerConnectionManager {
 		std::string                                                               turnpass_;
 		const std::map<std::string,std::string>                                   urlList_;
 		std::map<std::string,std::string>                                         m_videoaudiomap;
+
+	public:
+
+		std::string adminPassword;		// set once allows admin access to setting tokens and streams.
+
+
+		const std::map<std::string, std::string> tokenMap;		// token, stream_name		token is unique random string. stream_name is valid stream name
+
+
+		virtual bool hasToken(const std::string &stream_name, const std::string &token);
+		virtual bool isAdmin(const std::string &pwd);
+		virtual bool hasStream(const std::string &stream_name);
+
+		virtual const Json::Value adminAddStream(const std::string &stream_name, const std::string &url);
+		virtual const Json::Value adminRemoveStream(const std::string &stream_name);
+		virtual const Json::Value adminAddToken(const std::string &stream_name, const std::string &token);
+		virtual const Json::Value adminRemoveToken(const std::string &stream_name, const std::string &token);
+		virtual const Json::Value adminGetTokens();
+		virtual const Json::Value adminGetStreams(const std::string &stream_name);
+		virtual const Json::Value error(const char * error);
+
+
+
 };
 
 #endif
