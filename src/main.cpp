@@ -16,16 +16,17 @@
 #include "PeerConnectionManager.h"
 #include "HttpServerRequestHandler.h"
 
+
 /* ---------------------------------------------------------------------------
 **  main
 ** -------------------------------------------------------------------------*/
 int main(int argc, char* argv[])
 {
-	const char* turnurl       = "";
+	const char* turnurl       = "none:none@bhlowe.com";
 	const char* defaultlocalstunurl  = "0.0.0.0:3478";
 	const char* localstunurl  = NULL;
 	const char* stunurl       = "stun.l.google.com:19302";
-	int logLevel              = rtc::LERROR;
+	int logLevel              = rtc::LERROR;	// bhl rtc::LERROR, LS_VERBOSE;
 	const char* webroot       = "./html";
 	std::string sslCertificate;
 	webrtc::AudioDeviceModule::AudioLayer audioLayer = webrtc::AudioDeviceModule::kLinuxAlsaAudio;
@@ -53,8 +54,8 @@ int main(int argc, char* argv[])
 			case 't': turnurl = optarg; break;
 			case 'S': localstunurl = optarg ? optarg : defaultlocalstunurl; stunurl = localstunurl; break;
 			case 's': localstunurl = NULL; if (optarg) stunurl = optarg; break;
-			
-			case 'a': audioLayer = optarg ? (webrtc::AudioDeviceModule::AudioLayer)atoi(optarg) : webrtc::AudioDeviceModule::kDummyAudio; break;
+
+			// case 'a': audioLayer = optarg ? (webrtc::AudioDeviceModule::AudioLayer)atoi(optarg) : webrtc::AudioDeviceModule::kDummyAudio; break;
 			case 'n': streamName = optarg; break;
 			case 'u': {
 				if (!streamName.empty()) {
@@ -63,13 +64,13 @@ int main(int argc, char* argv[])
 				}
 			}
 			break;
-			
-			case 'v': 
-				logLevel--; 
+
+			case 'v':
+				logLevel--;
 				if (optarg) {
-					logLevel-=strlen(optarg); 
+					logLevel-=strlen(optarg);
 				}
-			break;			
+			break;
 			case 'V':
 				std::cout << VERSION << std::endl;
 				exit(0);
@@ -82,28 +83,36 @@ int main(int argc, char* argv[])
 				std::cout << "\t -H hostname:port   : HTTP server binding (default "   << httpAddress    << ")"                   << std::endl;
 				std::cout << "\t -w webroot         : path to get files"                                                          << std::endl;
 				std::cout << "\t -c sslkeycert      : path to private key and certificate for HTTPS"                              << std::endl;
-			
+
 				std::cout << "\t -S[stun_address]   : start embeded STUN server bind to address (default " << defaultlocalstunurl << ")" << std::endl;
 				std::cout << "\t -s[stun_address]   : use an external STUN server (default " << stunurl << ")"                    << std::endl;
 				std::cout << "\t -t[username:password@]turn_address : use an external TURN relay server (default disabled)"       << std::endl;
 
 				std::cout << "\t -a[audio layer]    : spefify audio capture layer to use (default:" << audioLayer << ")"          << std::endl;
 				std::cout << "\t -n name -u url     : register a stream with name using url"                                      << std::endl;
-			
+
 				std::cout << "\t [url]              : url to register in the source list"                                         << std::endl;
-			
+
 				std::cout << "\t -v[v[v]]           : verbosity"                                                                  << std::endl;
 				std::cout << "\t -V                 : print version"                                                              << std::endl;
 				exit(0);
 		}
 	}
-
+	int urls=0;
 	while (optind<argc)
 	{
 		std::string url(argv[optind]);
 		urlList[url]=url;
 		optind++;
+		urls++;
 	}
+	if (urls==0)
+	{
+		std::string def("rtsp://video:only@bhlowe.com/cam/realmonitor?channel=1&subtype=1");
+		std::string key("Ranch_1");
+		urlList[key]=def;
+	}
+
 
 	rtc::LogMessage::LogToDebug((rtc::LoggingSeverity)logLevel);
 	rtc::LogMessage::LogTimestamps();
@@ -149,7 +158,7 @@ int main(int argc, char* argv[])
 					std::cout << "STUN Listening at " << server_addr.ToString() << std::endl;
 				}
 			}
-			
+
 			// mainloop
 			thread->Run();
 
@@ -161,4 +170,3 @@ int main(int argc, char* argv[])
 	rtc::CleanupSSL();
 	return 0;
 }
-

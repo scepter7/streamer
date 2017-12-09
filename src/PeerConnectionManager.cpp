@@ -17,7 +17,10 @@
 #include "media/engine/webrtcvideocapturerfactory.h"
 
 #include "PeerConnectionManager.h"
+#if !BHL
 #include "V4l2AlsaMap.h"
+#endif
+
 #include "CivetServer.h"
 
 #ifdef HAVE_LIVE555
@@ -74,8 +77,10 @@ PeerConnectionManager::PeerConnectionManager(const std::string & stunurl, const 
 		}
 	}
 
+	#if !BHL
 	// build video audio map
 	m_videoaudiomap = getV4l2AlsaMap();
+	#endif
 }
 
 /* ---------------------------------------------------------------------------
@@ -91,8 +96,10 @@ PeerConnectionManager::~PeerConnectionManager()
 ** -------------------------------------------------------------------------*/
 const Json::Value PeerConnectionManager::getMediaList()
 {
-	Json::Value value(Json::arrayValue);
+	std::cout << "PCM: getMediaList:" << std::endl;
 
+	Json::Value value(Json::arrayValue);
+#if !BHL
 	std::unique_ptr<webrtc::VideoCaptureModule::DeviceInfo> info(webrtc::VideoCaptureFactory::CreateDeviceInfo());
 	if (info)
 	{
@@ -108,16 +115,17 @@ const Json::Value PeerConnectionManager::getMediaList()
 				RTC_LOG(INFO) << "video device name:" << name << " id:" << id;
 				Json::Value media;
 				media["video"] = name;
-				
+#if !BHL
 				std::map<std::string,std::string>::iterator it = m_videoaudiomap.find(name);
 				if (it != m_videoaudiomap.end()) {
 					media["audio"] = it->second;
-				}				
+				}
 				value.append(media);
+#endif
 			}
 		}
 	}
-
+#endif
 	for (auto url : urlList_)
 	{
 		Json::Value media;
@@ -135,7 +143,7 @@ const Json::Value PeerConnectionManager::getMediaList()
 const Json::Value PeerConnectionManager::getVideoDeviceList()
 {
 	Json::Value value(Json::arrayValue);
-
+#if !BHL
 	std::unique_ptr<webrtc::VideoCaptureModule::DeviceInfo> info(webrtc::VideoCaptureFactory::CreateDeviceInfo());
 	if (info)
 	{
@@ -153,6 +161,7 @@ const Json::Value PeerConnectionManager::getVideoDeviceList()
 			}
 		}
 	}
+#endif
 
 	for (auto url : urlList_)
 	{
@@ -168,7 +177,7 @@ const Json::Value PeerConnectionManager::getVideoDeviceList()
 const Json::Value PeerConnectionManager::getAudioDeviceList()
 {
 	Json::Value value(Json::arrayValue);
-
+	#if !BHL
 	int16_t num_audioDevices = audioDeviceModule_->RecordingDevices();
 	RTC_LOG(INFO) << "nb audio devices:" << num_audioDevices;
 
@@ -186,7 +195,7 @@ const Json::Value PeerConnectionManager::getAudioDeviceList()
 	for (auto& pair : deviceMap) {
 		value.append(pair.first);
 	}
-
+	#endif
 	return value;
 }
 
@@ -197,11 +206,11 @@ std::string getServerIpFromClientIp(int clientip)
 	std::string serverAddress;
 	char host[NI_MAXHOST];
 	struct ifaddrs *ifaddr = NULL;
-	if (getifaddrs(&ifaddr) == 0) 
+	if (getifaddrs(&ifaddr) == 0)
 	{
-		for (struct ifaddrs* ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) 
+		for (struct ifaddrs* ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
 		{
-			if ( (ifa->ifa_netmask != NULL) && (ifa->ifa_netmask->sa_family == AF_INET) && (ifa->ifa_addr != NULL) && (ifa->ifa_addr->sa_family == AF_INET) )  
+			if ( (ifa->ifa_netmask != NULL) && (ifa->ifa_netmask->sa_family == AF_INET) && (ifa->ifa_addr != NULL) && (ifa->ifa_addr->sa_family == AF_INET) )
 			{
 				struct sockaddr_in* addr = (struct sockaddr_in*)ifa->ifa_addr;
 				struct sockaddr_in* mask = (struct sockaddr_in*)ifa->ifa_netmask;
@@ -316,21 +325,21 @@ const Json::Value PeerConnectionManager::createOffer(const std::string &peerid, 
 	else
 	{
 		rtc::scoped_refptr<webrtc::PeerConnectionInterface> peerConnection = peerConnectionObserver->getPeerConnection();
-		
+
 		// set bandwidth
 		std::string tmp;
 		if (CivetServer::getParam(options, "bitrate", tmp)) {
 			int bitrate = std::stoi(tmp);
-			
+
 			webrtc::PeerConnectionInterface::BitrateParameters bitrateParam;
 			bitrateParam.min_bitrate_bps = rtc::Optional<int>(bitrate/2);
 			bitrateParam.current_bitrate_bps = rtc::Optional<int>(bitrate);
 			bitrateParam.max_bitrate_bps = rtc::Optional<int>(bitrate*2);
-			peerConnection->SetBitrate(bitrateParam);			
-			
+			peerConnection->SetBitrate(bitrateParam);
+
 			RTC_LOG(WARNING) << "set bitrate:" << bitrate;
-		}			
-		
+		}
+
 		if (!this->AddStreams(peerConnectionObserver->getPeerConnection(), videourl, audiourl, options))
 		{
 			RTC_LOG(WARNING) << "Can't add stream";
@@ -428,22 +437,22 @@ const Json::Value PeerConnectionManager::call(const std::string & peerid, const 
 		else
 		{
 			rtc::scoped_refptr<webrtc::PeerConnectionInterface> peerConnection = peerConnectionObserver->getPeerConnection();
-			
+
 			// set bandwidth
 			std::string tmp;
 			if (CivetServer::getParam(options, "bitrate", tmp)) {
 				int bitrate = std::stoi(tmp);
-				
+
 				webrtc::PeerConnectionInterface::BitrateParameters bitrateParam;
 				bitrateParam.min_bitrate_bps = rtc::Optional<int>(bitrate/2);
 				bitrateParam.current_bitrate_bps = rtc::Optional<int>(bitrate);
 				bitrateParam.max_bitrate_bps = rtc::Optional<int>(bitrate*2);
-				peerConnection->SetBitrate(bitrateParam);			
-				
+				peerConnection->SetBitrate(bitrateParam);
+
 				RTC_LOG(WARNING) << "set bitrate:" << bitrate;
-			}			
-			
-			
+			}
+
+
 			RTC_LOG(INFO) << "nbStreams local:" << peerConnection->local_streams()->count() << " remote:" << peerConnection->remote_streams()->count() << " localDescription:" << peerConnection->local_description();
 
 			// register peerid
@@ -588,7 +597,7 @@ const Json::Value PeerConnectionManager::hangUp(const std::string &peerid)
 const Json::Value PeerConnectionManager::getIceCandidateList(const std::string &peerid)
 {
 	RTC_LOG(INFO) << __FUNCTION__;
-	
+
 	Json::Value value;
 	std::map<std::string, PeerConnectionObserver* >::iterator  it = peer_connectionobs_map_.find(peerid);
 	if (it != peer_connectionobs_map_.end())
@@ -629,7 +638,7 @@ const Json::Value PeerConnectionManager::getPeerConnectionList()
 				for (unsigned int i = 0; i<localstreams->count(); i++) {
 					if (localstreams->at(i)) {
 						Json::Value tracks;
-						
+
 						const webrtc::VideoTrackVector& videoTracks = localstreams->at(i)->GetVideoTracks();
 						for (unsigned int j=0; j<videoTracks.size() ; j++)
 						{
@@ -642,17 +651,17 @@ const Json::Value PeerConnectionManager::getPeerConnectionList()
 							Json::Value track;
 							tracks[audioTracks.at(j)->kind()].append(audioTracks.at(j)->id());
 						}
-						
+
 						Json::Value stream;
 						stream[localstreams->at(i)->label()] = tracks;
-						
-						streams.append(stream);						
+
+						streams.append(stream);
 					}
 				}
 			}
 			content["streams"] = streams;
 		}
-		
+
 		// get Stats
 		content["stats"] = it.second->getStats();
 
@@ -740,6 +749,7 @@ rtc::scoped_refptr<webrtc::VideoTrackInterface> PeerConnectionManager::CreateVid
 	}
 	else
 	{
+#if !BHL
 		std::unique_ptr<webrtc::VideoCaptureModule::DeviceInfo> info(webrtc::VideoCaptureFactory::CreateDeviceInfo());
 		if (info)
 		{
@@ -760,6 +770,7 @@ rtc::scoped_refptr<webrtc::VideoTrackInterface> PeerConnectionManager::CreateVid
 				}
 			}
 		}
+#endif
 
 	}
 
@@ -778,7 +789,7 @@ rtc::scoped_refptr<webrtc::VideoTrackInterface> PeerConnectionManager::CreateVid
 
 rtc::scoped_refptr<webrtc::AudioTrackInterface> PeerConnectionManager::CreateAudioTrack(const std::string & audiourl, const std::string & options)
 {
-	RTC_LOG(INFO) << "audiourl:" << audiourl << " options:" << options;
+	RTC_LOG(INFO) << "CreateAudioTrack audiourl:" << audiourl << " options:" << options;
 
 	rtc::scoped_refptr<webrtc::AudioTrackInterface> audio_track;
 	if (audiourl.find("rtsp://") == 0)
@@ -817,7 +828,7 @@ rtc::scoped_refptr<webrtc::AudioTrackInterface> PeerConnectionManager::CreateAud
 	}
 	return audio_track;
 }
-  
+
 /* ---------------------------------------------------------------------------
 **  Add a stream to a PeerConnection
 ** -------------------------------------------------------------------------*/
@@ -836,7 +847,7 @@ bool PeerConnectionManager::AddStreams(webrtc::PeerConnectionInterface* peer_con
 	if (audioit != urlList_.end()) {
 		audio = audioit->second;
 	}
-		
+
 	// compute stream label removing space because SDP use label
 	std::string streamLabel = video;
 	streamLabel.erase(std::remove_if(streamLabel.begin(), streamLabel.end(), isspace), streamLabel.end());
@@ -849,10 +860,12 @@ bool PeerConnectionManager::AddStreams(webrtc::PeerConnectionInterface* peer_con
 			if (video.find("rtsp://") == 0) {
 				audio = video;
 			} else {
+				#if !BHL
 				std::map<std::string,std::string>::iterator it = m_videoaudiomap.find(video);
 				if (it != m_videoaudiomap.end()) {
 					audio = it->second;
 				}
+				#endif
 			}
 		}
 
@@ -869,7 +882,7 @@ bool PeerConnectionManager::AddStreams(webrtc::PeerConnectionInterface* peer_con
 			if ( (video_track) && (!stream->AddTrack(video_track)) )
 			{
 				RTC_LOG(LS_ERROR) << "Adding VideoTrack to MediaStream failed";
-			} 
+			}
 
 			if ( (audio_track) && (!stream->AddTrack(audio_track)) )
 			{
@@ -925,6 +938,98 @@ void PeerConnectionManager::PeerConnectionObserver::OnIceCandidate(const webrtc:
 		jmessage[kCandidateSdpName] = sdp;
 		iceCandidateList_.append(jmessage);
 	}
+
+
+
 }
 
 
+
+
+
+	// BHL
+bool PeerConnectionManager::hasToken(const std::string &stream_name, const std::string &token)
+ {
+/*
+	// TODO Implement
+	 std::string name = tokenMap.find(token);
+	 if (name!=NULL)
+	 {
+	 	if (name.equals(stream_name))
+		{
+			if (!hasStream(stream_name))
+			{
+				// cout warning.. stream should exist if checking token.
+				return false;
+			}
+			return true;		//
+	 	}
+	}
+
+		*/
+		return false;
+ }
+
+ bool PeerConnectionManager::isAdmin(const std::string &pwd)
+{
+		return true;	// TODO: Check pwd against global password.
+		// return adminPassword.equals(pwd);
+}
+
+ bool PeerConnectionManager::hasStream(const std::string &stream_name)
+{
+	return false;
+
+	// TODO: return urlList_.find(stream_name) != NULL;
+}
+
+const Json::Value PeerConnectionManager::error(const char *err)
+{
+	Json::Value value(Json::arrayValue);
+	// TODO: Add "error" json element
+	// value.append("error", err);
+	return value;
+}
+
+const Json::Value PeerConnectionManager::adminAddStream(const std::string &stream_name, const std::string &url)
+{
+	Json::Value value(Json::arrayValue);
+	if (hasStream(stream_name))
+		return error("Stream exists");
+	// TODO:
+	// Add map entry... key=stream_name, value= url
+	// urlList_[stream_name] = url;
+
+	return value;
+}
+const Json::Value PeerConnectionManager::adminRemoveStream(const std::string &stream_name)
+{
+	Json::Value value(Json::arrayValue);
+	return value;
+}
+
+
+const Json::Value PeerConnectionManager::adminAddToken(const std::string &stream_name, const std::string &token)
+{
+	Json::Value value(Json::arrayValue);
+	return value;
+}
+
+
+const Json::Value PeerConnectionManager::adminRemoveToken(const std::string &stream_name, const std::string &token)
+{
+	Json::Value value(Json::arrayValue);
+	return value;
+}
+
+const Json::Value PeerConnectionManager::adminGetTokens()
+{
+	Json::Value value(Json::arrayValue);
+	return value;
+}
+
+const Json::Value PeerConnectionManager::adminGetStreams(const std::string &stream_name)
+{
+	Json::Value value(Json::arrayValue);
+	return value;
+}
