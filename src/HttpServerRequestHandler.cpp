@@ -116,17 +116,7 @@ bool HttpServerRequestHandler::isAdmin(const struct mg_request_info *req_info)
   return false;
 }
 
-const Json::Value HttpServerRequestHandler::unauthorized()
-{
-  std::string msg("unauthorized");
-  return error(msg);
-}
 
-const Json::Value HttpServerRequestHandler::error(std::string &msg)
-{
-  const Json::Value error;
-  return error;
-}
 
 /* ---------------------------------------------------------------------------
 **  Constructor
@@ -216,14 +206,17 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 		return m_webRtcServer->getPeerConnectionList();
 	};
 
-
-  // TODO: Fix .. uncommenting gives compile error.
 	m_func["/getStreamList"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
 		return m_webRtcServer->getStreamList();
 	};
 
 
-  m_func["/adminAddStream"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+  m_func["/listStreams"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+    if (!isAdmin(req_info)) return unauthorized();
+    return m_webRtcServer->listStreams();
+  };
+
+  m_func["/addStream"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
     std::string stream_name, url;
     if (!isAdmin(req_info)) return unauthorized();
       CivetServer::getParam(req_info->query_string, "stream_name", stream_name);
@@ -231,26 +224,27 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
     return m_webRtcServer->addStream(stream_name, url);
   };
 
-  m_func["/adminRemoveStream"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+  m_func["/removeStream"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
     std::string stream_name;
     if (req_info->query_string) {
       CivetServer::getParam(req_info->query_string, "stream_name", stream_name);
-        }
+    }
 
     return m_webRtcServer->removeStream(stream_name);
   };
 
-  m_func["/adminAddToken"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+  m_func["/addToken"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
     std::string stream_name, token;
+    RTC_LOG(LS_ERROR) << "addToken req.";
+
 
     if (!isAdmin(req_info)) return unauthorized();
     CivetServer::getParam(req_info->query_string, "stream_name", stream_name);
     CivetServer::getParam(req_info->query_string, "token", token);
     return m_webRtcServer->addToken(stream_name, token);
-
-
   };
-  m_func["/adminRemoveToken"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+
+  m_func["/removeToken"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
     std::string stream_name, token;
     if (!isAdmin(req_info)) return unauthorized();
       CivetServer::getParam(req_info->query_string, "stream_name", stream_name);
@@ -258,12 +252,14 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
       return m_webRtcServer->removeToken(stream_name, token);
   };
 
-  m_func["/adminGetTokens"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+  m_func["/listTokens"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
     if (!isAdmin(req_info)) return unauthorized();
-    return m_webRtcServer->getTokens();
+    return m_webRtcServer->listTokens();
   };
 
-
+  m_func["/test"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+		return m_webRtcServer->test();
+	};
 
 
 	m_func["/help"]                  = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
@@ -304,7 +300,10 @@ httpFunction HttpServerRequestHandler::getFunction(const std::string& uri)
 	if (it != m_func.end())
 	{
 		fct = it->second;
+    RTC_LOG(LS_ERROR) << "req:" << it->first;
 	}
+
+
 
 	return fct;
 }

@@ -278,27 +278,28 @@ class PeerConnectionManager {
 		std::string                                                               turnurl_;
 		std::string                                                               turnuser_;
 		std::string                                                               turnpass_;
-		const std::map<std::string,std::string>                                   urlList_;
+		std::map<std::string,std::string>                                   			urlList_;
 		std::map<std::string,std::string>                                         m_videoaudiomap;
 
 	public:
-
 
 		std::map<std::string, std::string> tokenMap;		// token, stream_name		token is unique random string. stream_name is valid stream name/id
 
 
 		virtual bool hasToken(const std::string &token, const std::string &stream_name);
 		virtual bool isAdmin(const std::string &pwd);
-		virtual bool hasStream(const std::string &stream_name);
 
+		virtual bool hasStream(const std::string &stream_name);
+		virtual const Json::Value listStreams();
 		virtual const Json::Value addStream(const std::string &stream_name, const std::string &url);
 		virtual const Json::Value removeStream(const std::string &stream_name);
-		virtual const Json::Value addToken(const std::string &stream_name, const std::string &token);
-		virtual const Json::Value removeToken(const std::string &stream_name, const std::string &token);
-		virtual const Json::Value getTokens();
-		virtual const Json::Value getStreams(const std::string &stream_name);
-		virtual const Json::Value error(const char * error);
 
+		virtual const Json::Value addToken(const std::string &token, const std::string &stream_name);
+		virtual const Json::Value removeToken(const std::string &token, const std::string &stream_name);
+		virtual const Json::Value listTokens();
+		static  const Json::Value error(const std::string &err);
+		virtual const Json::Value test();
+		static const Json::Value success();
 
 };
 

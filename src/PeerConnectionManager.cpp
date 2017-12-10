@@ -48,7 +48,7 @@ PeerConnectionManager::PeerConnectionManager(const std::string & stunurl, const 
 	, peer_connection_factory_(webrtc::CreatePeerConnectionFactory(NULL,
                                                                     rtc::Thread::Current(),
                                                                     NULL,
-                                                                    audioDeviceModule_,
+                                                                    audioDeviceModule_,	//
                                                                     webrtc::CreateBuiltinAudioEncoderFactory(),
                                                                     audioDecoderfactory_,
                                                                     NULL,
@@ -97,7 +97,6 @@ PeerConnectionManager::~PeerConnectionManager()
 const Json::Value PeerConnectionManager::getMediaList()
 {
 	std::cout << "PCM: getMediaList:" << std::endl;
-
 	Json::Value value(Json::arrayValue);
 #if USE_ALSA
 	std::unique_ptr<webrtc::VideoCaptureModule::DeviceInfo> info(webrtc::VideoCaptureFactory::CreateDeviceInfo());
@@ -125,8 +124,7 @@ const Json::Value PeerConnectionManager::getMediaList()
 	}
 #endif
 
-	for (auto url : urlList_)
-	{
+	for (auto url : urlList_) {
 		Json::Value media;
 		media["video"] = url.first;
 
@@ -770,7 +768,6 @@ rtc::scoped_refptr<webrtc::VideoTrackInterface> PeerConnectionManager::CreateVid
 			}
 		}
 #endif
-
 	}
 
 	if (!capturer)
@@ -801,6 +798,8 @@ rtc::scoped_refptr<webrtc::AudioTrackInterface> PeerConnectionManager::CreateAud
 	}
 	else
 	{
+		#if USE_ALSA
+
 		audioDeviceModule_->Init();
 		int16_t num_audioDevices = audioDeviceModule_->RecordingDevices();
 		int16_t idx_audioDevice = -1;
@@ -824,6 +823,7 @@ rtc::scoped_refptr<webrtc::AudioTrackInterface> PeerConnectionManager::CreateAud
 			rtc::scoped_refptr<webrtc::AudioSourceInterface> audioSource = peer_connection_factory_->CreateAudioSource(NULL);
 			audio_track = peer_connection_factory_->CreateAudioTrack(kAudioLabel, audioSource);
 		}
+#endif
 	}
 	return audio_track;
 }
@@ -967,53 +967,107 @@ bool PeerConnectionManager::hasToken(const std::string &token, const std::string
 	return count >0;
 }
 
-const Json::Value PeerConnectionManager::error(const char *err)
+const Json::Value PeerConnectionManager::error(const std::string &err)
 {
-	Json::Value value(Json::arrayValue);
-	// TODO: Add "error" json element
-	// value.append("error", err);
+	Json::Value value;
+	value["error"] = err;
+	value["success"] = false;
 	return value;
 }
+
+const Json::Value PeerConnectionManager::success()
+{
+	Json::Value value;
+	value["success"] = true;
+	return value;
+}
+
+
+
+const Json::Value PeerConnectionManager::listStreams()
+{
+	Json::Value value(Json::arrayValue);
+	for (auto url : urlList_)
+	{
+		Json::Value entry;
+		entry["name"] = url.first;
+		entry["url"] = url.second;
+		value.append(entry);
+	}
+	return value;
+}
+
 
 const Json::Value PeerConnectionManager::addStream(const std::string &stream_name, const std::string &url)
 {
-	Json::Value value(Json::arrayValue);
-	if (hasStream(stream_name))
-		return error("Stream exists");
-	// TODO:
-	// Add map entry... key=stream_name, value= url
-	// urlList_[stream_name] = url;
-
-	return value;
+	if (hasStream("stream_name"))
+			return error("stream already defined ");
+	urlList_[stream_name]=url;
+	return success();
 }
+
 const Json::Value PeerConnectionManager::removeStream(const std::string &stream_name)
 {
-	Json::Value value(Json::arrayValue);
-	return value;
+	std::map<std::string, std::string >::iterator  it = urlList_.find(stream_name);
+	if (it != tokenMap.end())
+	{
+		// TODO: Delete all viewers of this stream.. and properly remove all traces...
+		RTC_LOG(LS_ERROR) << "removeStream "<<stream_name;
+		urlList_.erase(it);
+		return success();
+  }
+	return error("stream_name not found");
 }
 
 
-const Json::Value PeerConnectionManager::addToken(const std::string &stream_name, const std::string &token)
+const Json::Value PeerConnectionManager::addToken(const std::string &token, const std::string &stream_name)
 {
-	Json::Value value(Json::arrayValue);
-	return value;
+	RTC_LOG(LS_ERROR) << "addToken "<<token<< " " << stream_name;
+	tokenMap.insert(std::pair<std::string, std::string >(token, stream_name));
+	return success();
 }
 
 
-const Json::Value PeerConnectionManager::removeToken(const std::string &stream_name, const std::string &token)
+const Json::Value PeerConnectionManager::removeToken(const std::string &token, const std::string &stream_name)
+{
+	std::map<std::string, std::string >::iterator  it = tokenMap.find(token);
+	if (it != tokenMap.end())
+	{
+		RTC_LOG(LS_ERROR) << "removeToken "<<token;
+		tokenMap.erase(it);
+		return success();
+  }
+
+	return error("token not found");
+}
+
+const Json::Value PeerConnectionManager::listTokens()
 {
 	Json::Value value(Json::arrayValue);
+
+	for (auto token : tokenMap)
+	{
+		Json::Value e;
+		RTC_LOG(LS_ERROR) << " token "  << " " << token.first << " -> "<< token.second;
+
+		e[token.second] = token.first;
+		value.append(e);
+	}
+
 	return value;
 }
 
-const Json::Value PeerConnectionManager::getTokens()
+const Json::Value PeerConnectionManager::test()
 {
 	Json::Value value(Json::arrayValue);
-	return value;
-}
+	std::string err;
 
-const Json::Value PeerConnectionManager::getStreams(const std::string &stream_name)
-{
-	Json::Value value(Json::arrayValue);
+	#if 0
+  if (hasStream("foo"))
+	{
+			Json::Value e("error");
+			value.append(e);
+	}
+#endif
 	return value;
 }

@@ -24,10 +24,26 @@ class HttpServerRequestHandler : public CivetServer
 
 
 	protected:
+
+
 		PeerConnectionManager* m_webRtcServer;
 		std::map<std::string,httpFunction> m_func;
 		bool isAdmin(const struct mg_request_info *req_info);
-		const Json::Value unauthorized();
-		const Json::Value error(std::string &error);
+
+	/*	const Json::Value error(std::string error)
+		{
+					return PeerConnectionManager::error(error);
+		}
+
+		const Json::Value success();
+	*/
+
+		const Json::Value unauthorized() {
+			std::string msg("unauthorized");
+			return PeerConnectionManager::error(msg);
+
+			// return error(msg);
+		}
+
 
 };
