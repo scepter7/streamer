@@ -295,7 +295,7 @@ class PeerConnectionManager {
 		virtual const Json::Value removeStream(const std::string &stream_name);
 
 		virtual const Json::Value addToken(const std::string &token, const std::string &stream_name);
-		virtual const Json::Value removeToken(const std::string &token, const std::string &stream_name);
+		virtual const Json::Value removeToken(const std::string &token);
 		virtual const Json::Value listTokens();
 		static  const Json::Value error(const std::string &err);
 		virtual const Json::Value test();

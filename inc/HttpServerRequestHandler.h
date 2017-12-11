@@ -25,24 +25,20 @@ class HttpServerRequestHandler : public CivetServer
 
 	protected:
 
+		std::string prefix;		// server prefix. Either "" or something like "/webrtc-api"
+		std::string auth_key;		// admin auth_key to allow managing tokens/streams.
 
 		PeerConnectionManager* m_webRtcServer;
 		std::map<std::string,httpFunction> m_func;
-		bool isAdmin(const struct mg_request_info *req_info);
+		bool isAdmin(const struct mg_request_info *req_info, const Json::Value & in);
 
-	/*	const Json::Value error(std::string error)
-		{
-					return PeerConnectionManager::error(error);
-		}
+		bool hasToken(const struct mg_request_info *req_info, const Json::Value & in);	// check if user has supplied a valid token.
 
-		const Json::Value success();
-	*/
+		std::string getParam(const struct mg_request_info *req_info, const Json::Value & in, const char *arg);
 
 		const Json::Value unauthorized() {
 			std::string msg("unauthorized");
 			return PeerConnectionManager::error(msg);
-
-			// return error(msg);
 		}
 
 

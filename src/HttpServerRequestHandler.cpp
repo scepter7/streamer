@@ -28,12 +28,12 @@ class RequestHandler : public CivetHandler
 		if (fct != NULL)
 		{
 			Json::Value  jmessage;
-
+      std::string body="";
 			// read input
 			long long tlen = req_info->content_length;
 			if (tlen > 0)
 			{
-				std::string body;
+				// std::string body;
 				long long nlen = 0;
 				char buf[1024];
 				while (nlen < tlen) {
@@ -49,7 +49,7 @@ class RequestHandler : public CivetHandler
 
 					nlen += rlen;
 				}
-				std::cout << "body:" << body << std::endl;
+				// std::cout << req_info->request_uri << ":" << body << std::endl;
 
 				// parse in
 				Json::Reader reader;
@@ -63,10 +63,12 @@ class RequestHandler : public CivetHandler
 			Json::Value out(fct(req_info, jmessage));
 
 			// fill out
-			if (out.isNull() == false)
+			if (!out.isNull())
 			{
-				std::string answer(Json::StyledWriter().write(out));
-				std::cout << "answer:" << answer << std::endl;
+        std::string answer(Json::StyledWriter().write(out));
+        //std::string answer(Json::JsonValueToString(out));
+				RTC_LOG(INFO) << "request:" << req_info->request_uri << " "<< body <<" response:" << answer;
+
 
 				mg_printf(conn,"HTTP/1.1 200 OK\r\n");
 				mg_printf(conn,"Access-Control-Allow-Origin: *\r\n");
@@ -107,15 +109,34 @@ const struct CivetCallbacks * getCivetCallbacks()
 	return &_callbacks;
 }
 
-bool HttpServerRequestHandler::isAdmin(const struct mg_request_info *req_info)
+std::string  HttpServerRequestHandler::getParam(const struct mg_request_info *req_info, const Json::Value & in, const char *param)
 {
-  if (req_info)
+  std::string out;
+
+  if (!rtc::GetStringFromJsonObject(in, param, &out))
   {
-    return true;
+    if (req_info && req_info->query_string && strlen(req_info->query_string))
+    {
+      CivetServer::getParam(req_info->query_string, param, out);
+    }
   }
-  return false;
+
+  if (out.empty())
+    RTC_LOG(LS_ERROR) << "getParam "<<param<<" not found";
+  return out;
 }
 
+
+// admin commands require an auth token.
+bool HttpServerRequestHandler::isAdmin(const struct mg_request_info *req_info, const Json::Value & in)
+{
+  return auth_key.compare(getParam(req_info, in, "auth"))==0;
+}
+
+bool HttpServerRequestHandler::hasToken(const struct mg_request_info *req_info, const Json::Value & in)
+{
+  return m_webRtcServer->hasToken(getParam(req_info, in, "token"), getParam(req_info, in, "stream_name"));
+}
 
 
 /* ---------------------------------------------------------------------------
@@ -124,6 +145,10 @@ bool HttpServerRequestHandler::isAdmin(const struct mg_request_info *req_info)
 HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtcServer, const std::vector<std::string>& options)
 	: CivetServer(options, getCivetCallbacks()), m_webRtcServer(webRtcServer)
 {
+
+  prefix = "/webrtc-api";
+  auth_key = "odie";
+
 	// http api callbacks
 	m_func["/getMediaList"]          = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
 		return m_webRtcServer->getMediaList();
@@ -147,10 +172,10 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 		std::string audiourl;
 		std::string options;
 		if (req_info->query_string) {
-            CivetServer::getParam(req_info->query_string, "peerid", peerid);
-            CivetServer::getParam(req_info->query_string, "url", url);
-            CivetServer::getParam(req_info->query_string, "audiourl", audiourl);
-            CivetServer::getParam(req_info->query_string, "options", options);
+          CivetServer::getParam(req_info->query_string, "peerid", peerid);
+          CivetServer::getParam(req_info->query_string, "url", url);
+          CivetServer::getParam(req_info->query_string, "audiourl", audiourl);
+          CivetServer::getParam(req_info->query_string, "options", options);
         }
 		return m_webRtcServer->call(peerid, url, audiourl, options, in);
 	};
@@ -177,29 +202,17 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 		return m_webRtcServer->createOffer(peerid, url, audiourl, options);
 	};
 	m_func["/setAnswer"]             = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-		std::string peerid;
-		if (req_info->query_string) {
-            CivetServer::getParam(req_info->query_string, "peerid", peerid);
-        }
-		m_webRtcServer->setAnswer(peerid, in);
+		m_webRtcServer->setAnswer(getParam(req_info, in, "peerid"), in);
 		Json::Value answer(1);
 		return answer;
 	};
 
 	m_func["/getIceCandidate"]       = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-		std::string peerid;
-		if (req_info->query_string) {
-            CivetServer::getParam(req_info->query_string, "peerid", peerid);
-        }
-		return m_webRtcServer->getIceCandidateList(peerid);
+		return m_webRtcServer->getIceCandidateList(getParam(req_info, in, "peerid"));
 	};
 
 	m_func["/addIceCandidate"]       = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-		std::string peerid;
-		if (req_info->query_string) {
-            CivetServer::getParam(req_info->query_string, "peerid", peerid);
-        }
-		return m_webRtcServer->addIceCandidate(peerid, in);
+		return m_webRtcServer->addIceCandidate(getParam(req_info, in, "peerid"), in);
 	};
 
 	m_func["/getPeerConnectionList"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
@@ -212,48 +225,35 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 
 
   m_func["/listStreams"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-    if (!isAdmin(req_info)) return unauthorized();
+    if (!isAdmin(req_info, in)) return unauthorized();
     return m_webRtcServer->listStreams();
   };
 
   m_func["/addStream"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-    std::string stream_name, url;
-    if (!isAdmin(req_info)) return unauthorized();
-      CivetServer::getParam(req_info->query_string, "stream_name", stream_name);
-      CivetServer::getParam(req_info->query_string, "url", url);
-    return m_webRtcServer->addStream(stream_name, url);
+    if (!isAdmin(req_info, in)) return unauthorized();
+    return m_webRtcServer->addStream(getParam(req_info, in, "stream_name"), getParam(req_info, in, "url"));
   };
 
   m_func["/removeStream"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
     std::string stream_name;
-    if (req_info->query_string) {
-      CivetServer::getParam(req_info->query_string, "stream_name", stream_name);
-    }
-
-    return m_webRtcServer->removeStream(stream_name);
+    return m_webRtcServer->removeStream(getParam(req_info, in, "stream_name"));
   };
 
+  // body:{"stream_name":"Macedo_WEBRTC_704x480","auth":"odie","token":"Macedo_WEBRTC_704x480_S10_OUOY"}
   m_func["/addToken"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-    std::string stream_name, token;
-    RTC_LOG(LS_ERROR) << "addToken req.";
-
-
-    if (!isAdmin(req_info)) return unauthorized();
-    CivetServer::getParam(req_info->query_string, "stream_name", stream_name);
-    CivetServer::getParam(req_info->query_string, "token", token);
-    return m_webRtcServer->addToken(stream_name, token);
+    if (!isAdmin(req_info, in))
+      return unauthorized();
+    return m_webRtcServer->addToken(getParam(req_info, in, "token"), getParam(req_info, in, "stream_name"));
   };
 
   m_func["/removeToken"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-    std::string stream_name, token;
-    if (!isAdmin(req_info)) return unauthorized();
-      CivetServer::getParam(req_info->query_string, "stream_name", stream_name);
-      CivetServer::getParam(req_info->query_string, "token", token);
-      return m_webRtcServer->removeToken(stream_name, token);
+    if (!isAdmin(req_info, in)) return unauthorized();
+      return m_webRtcServer->removeToken(getParam(req_info, in, "token"));
   };
 
+
   m_func["/listTokens"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-    if (!isAdmin(req_info)) return unauthorized();
+    if (!isAdmin(req_info, in)) return unauthorized();
     return m_webRtcServer->listTokens();
   };
 
@@ -277,7 +277,7 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 
 	m_func["/log"]                      = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
 		std::string loglevel;
-		if (req_info->query_string) {
+		if (isAdmin(req_info, in)) {
 			CivetServer::getParam(req_info->query_string, "level", loglevel);
 			if (!loglevel.empty()) {
 				rtc::LogMessage::LogToDebug((rtc::LoggingSeverity)atoi(loglevel.c_str()));
@@ -289,21 +289,31 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 
 	// register handlers
 	for (auto it : m_func) {
-		this->addHandler(it.first, new RequestHandler());
+		this->addHandler(prefix+it.first, new RequestHandler());
 	}
 }
 
-httpFunction HttpServerRequestHandler::getFunction(const std::string& uri)
+httpFunction HttpServerRequestHandler::getFunction(const std::string &uri)
 {
 	httpFunction fct = NULL;
-	std::map<std::string,httpFunction>::iterator it = m_func.find(uri);
+	std::map<std::string,httpFunction>::iterator it;
+  if (!prefix.empty())
+  {
+    if (uri.compare(0, prefix.length(), prefix) == 0)
+    {
+        std::string u = uri.substr (prefix.length());
+        it = m_func.find(u);
+    } else return NULL;
+  }
+  else
+  {
+    it = m_func.find(uri);
+  }
+
 	if (it != m_func.end())
 	{
 		fct = it->second;
-    RTC_LOG(LS_ERROR) << "req:" << it->first;
 	}
-
-
 
 	return fct;
 }

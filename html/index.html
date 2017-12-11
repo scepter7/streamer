@@ -26,27 +26,28 @@ nav a.active:hover {
     color: black;
 }
 video {
-    display: block; 
+    display: block;
     margin: 0 auto;
 }
 h2 {
-    text-align: center; 
+    text-align: center;
 }
 footer {
-    text-align: center; 
+    text-align: center;
 }
-</style> 
+</style>
 <script src="ajax.js" ></script>
 <script src="webrtcstreamer.js" ></script>
 <script>
 	// ------------------------------------------
 	// WebRTC connections
-	// ------------------------------------------	
+	// ------------------------------------------
 	var webRtcServerList = {};
+  var serverPrefix = "/webrtc-api";
 
 	// ------------------------------------------
 	// decode URL arguments
-	// ------------------------------------------	
+	// ------------------------------------------
 	var argurl = { video:location.search.slice(1) };
 	var argoptions;
 	if (typeof URLSearchParams != 'undefined') {
@@ -56,7 +57,7 @@ footer {
 	} else {
 		console.log("URLSearchParams not supported then no argument could be used");
 	}
-		
+
 	function getText(url) {
 		var text;
 		if (url.video) {
@@ -67,10 +68,10 @@ footer {
 		}
 		return text;
 	}
-	
+
 	// ------------------------------------------
-	// init device list 
-	// ------------------------------------------	
+	// init device list
+	// ------------------------------------------
 	function onGetDeviceList(remoteDeviceList) {
 		var deviceList = [];
                 if (argurl.video || argurl.audio) {
@@ -89,11 +90,11 @@ footer {
 			option.url = url;
 			option.text = getText(url);
 			option.id   = "nav_" + videoTag;
-			option.onclick = function () { 
+			option.onclick = function () {
 				if (this.className === "active") {
-					del(this.url); 
+					del(this.url);
 				} else {
-					add(this.url); 
+					add(this.url);
 				}
 			}
 			urllist.appendChild(option);
@@ -102,43 +103,43 @@ footer {
 			add(deviceList[0]);
 		}
 	}
-	
+
 	// ------------------------------------------
 	// Fill version
-	// ------------------------------------------	
+	// ------------------------------------------
 	function onVersion(version) {
 		document.getElementById("footer").innerHTML = "<p><a href='https://github.com/mpromonet/webrtc-streamer'>WebRTC-Streamer</a>"
 							+ " " + version.split(" ")[0] + "</p>";
 	}
-		
+
 	// ------------------------------------------
 	// add a webrtc client connection
-	// ------------------------------------------	
+	// ------------------------------------------
 	function del(url) {
 		var videoTag = "video_" + JSON.stringify(url);
-		
+
 		// disconnect webrtc connection
 		var webrtcServer = webRtcServerList[videoTag];
 		if (webrtcServer) {
-			webrtcServer.disconnect();		
+			webrtcServer.disconnect();
 			webRtcServerList[videoTag] = undefined;
 		}
-		
+
 		// remove the video element and its tile
 		var divElt = 	document.getElementById ("div_" + videoTag);
-		document.getElementById("content").removeChild(divElt); 
-				
+		document.getElementById("content").removeChild(divElt);
+
 		// unhighlight the navigation
 		var navElt = 	document.getElementById ("nav_" + videoTag);
-		navElt.className = "";		
+		navElt.className = "";
 	}
-		
+
 	// ------------------------------------------
 	// add a webrtc client connection
-	// ------------------------------------------	
+	// ------------------------------------------
 	function add(url) {
 		var videoTag = "video_" + JSON.stringify(url);
-		
+
 		// add a video element to display webrtc stream
 		if (document.getElementById (videoTag) === null) {
 			var divelt = document.createElement("div");
@@ -153,36 +154,38 @@ footer {
 			document.getElementById("content").appendChild(divelt);
 		}
 		var videoelt = 	document.getElementById (videoTag);
-		
+
 		// connect video element to webrtc stream
-		var webRtcServer = new WebRtcStreamer(videoTag);
+		var webRtcServer = new WebRtcStreamer(videoTag, serverPrefix);
 		webRtcServer.connect(url.video, url.audio, argoptions);
-			
-		// highlight the navigation 
+
+		// highlight the navigation
 		var navElt = 	document.getElementById ("nav_" + videoTag);
 		navElt.className = "active";
 
 		// register webrtc streamer connection
-		webRtcServerList[videoTag] = webRtcServer;		
+		webRtcServerList[videoTag] = webRtcServer;
 	}
-	
+
 	// ------------------------------------------
 	// load/unload callbacks
-	// ------------------------------------------	
-	window.onload         = function() { 
-		send("/getMediaList", null, null, onGetDeviceList); 
-		send("/version", null, null, onVersion); 
-	} 
-	window.onbeforeunload = function() { 
-		for (var url in webRtcServerList) { 
-			webRtcServerList[url].disconnect() 
-		} 
-	};	
+	// ------------------------------------------
+	window.onload         = function() {
+		send(serverPrefix+"/getMediaList", null, null, onGetDeviceList);
+		send(serverPrefix+"/version", null, null, onVersion);
+	}
+	window.onbeforeunload = function() {
+		for (var url in webRtcServerList) {
+			webRtcServerList[url].disconnect()
+		}
+	};
 </script>
 </head>
 <body>
 	<nav id="menu"></nav>
 	<div id="content"></div>
+  <div id="debug"></div>
+
 	<footer id="footer"></footer>
 </body>
 </html>

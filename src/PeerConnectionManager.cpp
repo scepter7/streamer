@@ -312,7 +312,7 @@ const Json::Value PeerConnectionManager::addIceCandidate(const std::string& peer
 const Json::Value PeerConnectionManager::createOffer(const std::string &peerid, const std::string & videourl, const std::string & audiourl, const std::string & options)
 {
 	Json::Value offer;
-	RTC_LOG(INFO) << __FUNCTION__;
+	RTC_LOG(INFO) << __FUNCTION__ << " video="<<videourl<< " audio="<<audiourl <<" options="<<options<<" peerid="<<peerid;
 
 	PeerConnectionObserver* peerConnectionObserver = this->CreatePeerConnection(peerid);
 	if (!peerConnectionObserver)
@@ -359,6 +359,9 @@ const Json::Value PeerConnectionManager::createOffer(const std::string &peerid, 
 		const webrtc::SessionDescriptionInterface* desc = peerConnectionObserver->getPeerConnection()->local_description();
 		if (desc)
 		{
+			// TODO: Strip rtsp:// URL from desc.
+			// Do not want to expose details about IP/password of RTSP source.
+
 			std::string sdp;
 			desc->ToString(&sdp);
 
@@ -1008,11 +1011,11 @@ const Json::Value PeerConnectionManager::addStream(const std::string &stream_nam
 
 const Json::Value PeerConnectionManager::removeStream(const std::string &stream_name)
 {
+
+	// return error("TODO: Implement ");
 	std::map<std::string, std::string >::iterator  it = urlList_.find(stream_name);
-	if (it != tokenMap.end())
+	if (it != urlList_.end())
 	{
-		// TODO: Delete all viewers of this stream.. and properly remove all traces...
-		RTC_LOG(LS_ERROR) << "removeStream "<<stream_name;
 		urlList_.erase(it);
 		return success();
   }
@@ -1022,13 +1025,13 @@ const Json::Value PeerConnectionManager::removeStream(const std::string &stream_
 
 const Json::Value PeerConnectionManager::addToken(const std::string &token, const std::string &stream_name)
 {
-	RTC_LOG(LS_ERROR) << "addToken "<<token<< " " << stream_name;
+	RTC_LOG(LS_ERROR) << "addToken token:"<<token<< " stream:" << stream_name;
 	tokenMap.insert(std::pair<std::string, std::string >(token, stream_name));
 	return success();
 }
 
 
-const Json::Value PeerConnectionManager::removeToken(const std::string &token, const std::string &stream_name)
+const Json::Value PeerConnectionManager::removeToken(const std::string &token)
 {
 	std::map<std::string, std::string >::iterator  it = tokenMap.find(token);
 	if (it != tokenMap.end())
@@ -1044,16 +1047,13 @@ const Json::Value PeerConnectionManager::removeToken(const std::string &token, c
 const Json::Value PeerConnectionManager::listTokens()
 {
 	Json::Value value(Json::arrayValue);
-
 	for (auto token : tokenMap)
 	{
 		Json::Value e;
-		RTC_LOG(LS_ERROR) << " token "  << " " << token.first << " -> "<< token.second;
-
-		e[token.second] = token.first;
+		e["token"] = token.first;
+		e["stream_name"] = token.second;
 		value.append(e);
 	}
-
 	return value;
 }
 
