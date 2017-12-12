@@ -957,11 +957,6 @@ bool PeerConnectionManager::hasToken(const std::string &token, const std::string
 	 return false;
  }
 
- bool PeerConnectionManager::isAdmin(const std::string &pwd)
-{
-		return true;	// TODO: Check pwd against global password.
-		// return adminPassword.equals(pwd);
-}
 
  bool PeerConnectionManager::hasStream(const std::string &stream_name)
 {
@@ -1011,8 +1006,7 @@ const Json::Value PeerConnectionManager::addStream(const std::string &stream_nam
 
 const Json::Value PeerConnectionManager::removeStream(const std::string &stream_name)
 {
-
-	// return error("TODO: Implement ");
+	// TODO: Stop and remove the stream if it is "streaming".
 	std::map<std::string, std::string >::iterator  it = urlList_.find(stream_name);
 	if (it != urlList_.end())
 	{

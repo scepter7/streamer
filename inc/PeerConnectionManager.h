@@ -287,8 +287,8 @@ class PeerConnectionManager {
 
 
 		virtual bool hasToken(const std::string &token, const std::string &stream_name);
-		virtual bool isAdmin(const std::string &pwd);
 
+		
 		virtual bool hasStream(const std::string &stream_name);
 		virtual const Json::Value listStreams();
 		virtual const Json::Value addStream(const std::string &stream_name, const std::string &url);
