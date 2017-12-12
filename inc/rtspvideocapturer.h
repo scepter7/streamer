@@ -172,7 +172,8 @@ class RTSPAudioSource : public webrtc::Notifier<webrtc::AudioSourceInterface>, p
 					RTC_LOG(LS_ERROR) << "RTSPAudioSource::onData error:No Audio decoder";
 				}
 			} else {
-				RTC_LOG(LS_ERROR) << "RTSPAudioSource::onData error:No Audio Sink";
+				// RTC_LOG(LS_ERROR) << "RTSPAudioSource::onData error:No Audio Sink";
+				success = true;	// bhl. I don't require audio.
 			}
 			return success;
 		}

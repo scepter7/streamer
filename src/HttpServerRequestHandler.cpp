@@ -67,7 +67,7 @@ class RequestHandler : public CivetHandler
 			{
         std::string answer(Json::StyledWriter().write(out));
         //std::string answer(Json::JsonValueToString(out));
-				RTC_LOG(INFO) << "request:" << req_info->request_uri << " "<< body <<" response:" << answer;
+				RTC_LOG(LS_ERROR) << "request:" << req_info->request_uri << " "<< body <<" response:" << answer;
 
 
 				mg_printf(conn,"HTTP/1.1 200 OK\r\n");
@@ -135,7 +135,11 @@ bool HttpServerRequestHandler::isAdmin(const struct mg_request_info *req_info, c
 
 bool HttpServerRequestHandler::hasToken(const struct mg_request_info *req_info, const Json::Value & in)
 {
-  return m_webRtcServer->hasToken(getParam(req_info, in, "token"), getParam(req_info, in, "stream_name"));
+  bool hasIt = m_webRtcServer->hasToken(getParam(req_info, in, "token"), getParam(req_info, in, "stream_name"));
+  if (!hasIt)
+    std::cout << "no token: "<< req_info->request_uri <<" token="<< getParam(req_info, in, "token")<<" stream="<< getParam(req_info, in, "stream_name")<<std::endl;
+
+  return true;
 }
 
 
@@ -163,7 +167,8 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 	};
 
 	m_func["/getIceServers"]         = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-		return m_webRtcServer->getIceServers(req_info->remote_addr);
+    if (!hasToken(req_info, in)) return unauthorized();
+    return m_webRtcServer->getIceServers(req_info->remote_addr);
 	};
 
 	m_func["/call"]                  = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
@@ -171,6 +176,8 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 		std::string url;
 		std::string audiourl;
 		std::string options;
+    if (!hasToken(req_info, in)) return unauthorized();
+
 		if (req_info->query_string) {
           CivetServer::getParam(req_info->query_string, "peerid", peerid);
           CivetServer::getParam(req_info->query_string, "url", url);
@@ -220,9 +227,9 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 	};
 
 	m_func["/getStreamList"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+    if (!isAdmin(req_info, in)) return unauthorized();
 		return m_webRtcServer->getStreamList();
 	};
-
 
   m_func["/listStreams"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
     if (!isAdmin(req_info, in)) return unauthorized();
@@ -235,14 +242,13 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
   };
 
   m_func["/removeStream"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-    std::string stream_name;
+    if (!isAdmin(req_info, in)) return unauthorized();
     return m_webRtcServer->removeStream(getParam(req_info, in, "stream_name"));
   };
 
   // body:{"stream_name":"Macedo_WEBRTC_704x480","auth":"odie","token":"Macedo_WEBRTC_704x480_S10_OUOY"}
   m_func["/addToken"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-    if (!isAdmin(req_info, in))
-      return unauthorized();
+    if (!isAdmin(req_info, in)) return unauthorized();
     return m_webRtcServer->addToken(getParam(req_info, in, "token"), getParam(req_info, in, "stream_name"));
   };
 
@@ -250,7 +256,6 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
     if (!isAdmin(req_info, in)) return unauthorized();
       return m_webRtcServer->removeToken(getParam(req_info, in, "token"));
   };
-
 
   m_func["/listTokens"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
     if (!isAdmin(req_info, in)) return unauthorized();
@@ -269,6 +274,7 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 		}
 		return answer;
 	};
+
 
 	m_func["/version"]                  = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
 		Json::Value answer(VERSION);
