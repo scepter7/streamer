@@ -1,5 +1,5 @@
 src/*.o
 *.a
 *.tgz
-
+streamer
 .remote-sync.json
