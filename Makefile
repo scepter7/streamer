@@ -8,6 +8,7 @@ LDFLAGS = -pthread $(SYSROOTOPT)
 WEBRTCROOT?=../webrtc
 WEBRTCBUILD?=Release
 PREFIX?=/usr
+
 GITVERSION=$(shell git describe --tags --always --dirty)
 VERSION=$(GITVERSION)
 

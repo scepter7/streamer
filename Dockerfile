@@ -24,8 +24,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends g++ autoconf au
 	&& ninja -C out/Release jsoncpp rtc_json webrtc \
 	&& cd /streamer \
 	&& make all \
-	&& rm -rf /webrtc \
-	&& apt-get clean
 
 # Make port 8000 available to the world outside this container
 EXPOSE 8000
