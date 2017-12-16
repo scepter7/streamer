@@ -1,0 +1,13 @@
+FROM d1
+
+WORKDIR /streamer
+ADD . /streamer
+
+RUN make live555 && make all
+
+# Make port 8000 available to the world outside this container
+EXPOSE 8000
+
+# Run when the container launches
+ENTRYPOINT [ "./streamer" ]
+
