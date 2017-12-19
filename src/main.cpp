@@ -52,7 +52,7 @@ int main(int argc, char* argv[])
 		{
 			case 'k':
 				if (optarg) {	//
-					authKey = strlen(optarg);
+					authKey = optarg;
 				}
 				break;	// TODO
 
