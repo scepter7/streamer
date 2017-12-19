@@ -46,7 +46,7 @@ int main(int argc, char* argv[])
 	httpAddress.append(httpPort);
 
 	int c = 0;
-	while ((c = getopt (argc, argv, "hVv::" "c:H:w:" "t:S::s::" "a::n:u:")) != -1)
+	while ((c = getopt (argc, argv, "hVv:k:" "c:H:w:" "t:S::s::" "a::n:u:")) != -1)
 	{
 		switch (c)
 		{
@@ -90,7 +90,7 @@ int main(int argc, char* argv[])
 		std::vector<std::string> options;
 		options.push_back("listening_ports");
 		options.push_back(httpAddress);
-		options.push_back(authKey);
+		//options.push_back(authKey);
 
 
 
