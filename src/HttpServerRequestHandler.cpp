@@ -259,8 +259,7 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
   };
 
   m_func["/listTokens"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-  	    if (!isAdmin(req_info, in)) return unauthorized();
-  	}
+    if (!isAdmin(req_info, in)) return unauthorized();
     return m_webRtcServer->listTokens();
   };
 
