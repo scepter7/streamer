@@ -151,7 +151,8 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 {
 
   prefix = "/webrtc-api";
-  auth_key = "odie";
+//  auth_key = "odie";
+  auth_key = auth;
 
 	// http api callbacks
 	m_func["/getMediaList"]          = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
@@ -258,9 +259,7 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
   };
 
   m_func["/listTokens"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-  	if (auth != "") {
-  		if (auth == "odie") return unauthorized();
-  	    //if (!isAdmin(req_info, in)) return unauthorized();
+  	    if (!isAdmin(req_info, in)) return unauthorized();
   	}
     return m_webRtcServer->listTokens();
   };
