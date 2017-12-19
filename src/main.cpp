@@ -38,6 +38,8 @@ int main(int argc, char* argv[])
 	std::string httpAddress("0.0.0.0:");
 	std::string httpPort = "8000";
 	std::string authKey = "";
+	bool test=false;
+
 	const char * port = getenv("PORT");
 	if (port)
 	{
@@ -46,7 +48,7 @@ int main(int argc, char* argv[])
 	httpAddress.append(httpPort);
 
 	int c = 0;
-	while ((c = getopt (argc, argv, "hVv:k:" "c:H:w:" "t:S::s::" "a::n:u:")) != -1)
+	while ((c = getopt (argc, argv, "thVv:k:" "c:H:w:" "t:S::s::" "a::n:u:")) != -1)
 	{
 		switch (c)
 		{
@@ -54,11 +56,14 @@ int main(int argc, char* argv[])
 				if (optarg) {	//
 					authKey = optarg;
 				}
-				break;	// TODO
+				break;
+			case 't':
+					test = true;
+					break;
 
 			case 'v':
 				logLevel--;
-				if (optarg) {	// 
+				if (optarg) {	//
 					logLevel -= strlen(optarg);
 				}
 			break;
@@ -78,6 +83,7 @@ int main(int argc, char* argv[])
 	rtc::Thread* thread = rtc::Thread::Current();
 	rtc::InitializeSSL();
 
+
 	// webrtc server
 	PeerConnectionManager webRtcServer(stunurl, turnurl, urlList, audioLayer);
 	if (!webRtcServer.InitializePeerConnection())
@@ -90,9 +96,15 @@ int main(int argc, char* argv[])
 		std::vector<std::string> options;
 		options.push_back("listening_ports");
 		options.push_back(httpAddress);
-		//options.push_back(authKey);
 
+		if (test)
+		{
+			options.push_back("document_root");
+			options.push_back("./html");
+			webRtcServer.addStream("Test", "rtsp://video:only@bhlowe.com/cam/realmonitor?channel=1&subtype=1");
+			std::cout << "Starting in test mode.. adding test stream and using .html";
 
+		}
 
 		try {
 			std::cout << "HTTP Listen at " << httpAddress << std::endl;
