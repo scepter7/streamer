@@ -2,3 +2,6 @@ src/*.o
 *.tgz
 streamer
 .remote-sync.json
+.cproject
+.project
+.settings/

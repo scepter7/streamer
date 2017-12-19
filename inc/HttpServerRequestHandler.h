@@ -18,7 +18,7 @@ typedef std::function<Json::Value(const struct mg_request_info *, const Json::Va
 class HttpServerRequestHandler : public CivetServer
 {
 	public:
-		HttpServerRequestHandler(PeerConnectionManager* webRtcServer, const std::vector<std::string>& options);
+		HttpServerRequestHandler(PeerConnectionManager* webRtcServer, const std::vector<std::string>& options, const std::string& auth);
 
 		httpFunction getFunction(const std::string& uri);
 

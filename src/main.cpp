@@ -37,6 +37,7 @@ int main(int argc, char* argv[])
 
 	std::string httpAddress("0.0.0.0:");
 	std::string httpPort = "8000";
+	std::string authKey = "";
 	const char * port = getenv("PORT");
 	if (port)
 	{
@@ -50,6 +51,9 @@ int main(int argc, char* argv[])
 		switch (c)
 		{
 			case 'k':
+				if (optarg) {	//
+					authKey = strlen(optarg);
+				}
 				break;	// TODO
 
 			case 'v':
@@ -86,12 +90,13 @@ int main(int argc, char* argv[])
 		std::vector<std::string> options;
 		options.push_back("listening_ports");
 		options.push_back(httpAddress);
+		options.push_back(authKey);
 
 
 
 		try {
 			std::cout << "HTTP Listen at " << httpAddress << std::endl;
-			HttpServerRequestHandler httpServer(&webRtcServer, options);
+			HttpServerRequestHandler httpServer(&webRtcServer, options, authKey);
 
 			// start STUN server if needed
 			std::unique_ptr<cricket::StunServer> stunserver;
