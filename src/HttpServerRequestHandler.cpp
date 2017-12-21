@@ -38,7 +38,7 @@ class RequestHandler : public CivetHandler
 				char buf[1024];
 				while (nlen < tlen) {
 					long long rlen = tlen - nlen;
-					if (rlen > sizeof(buf)) {
+					if (rlen > (long long) sizeof(buf)) {
 						rlen = sizeof(buf);
 					}
 					rlen = mg_read(conn, buf, (size_t)rlen);
@@ -49,7 +49,7 @@ class RequestHandler : public CivetHandler
 
 					nlen += rlen;
 				}
-				// std::cout << req_info->request_uri << ":" << body << std::endl;
+				// RTC_LOG(LS_ERROR) << req_info->request_uri << ":" << body << std::endl;
 
 				// parse in
 				Json::Reader reader;
@@ -67,8 +67,7 @@ class RequestHandler : public CivetHandler
 			{
         std::string answer(Json::StyledWriter().write(out));
         //std::string answer(Json::JsonValueToString(out));
-				RTC_LOG(LS_ERROR) << "request:" << req_info->request_uri << " "<< body <<" response:" << answer;
-
+				RTC_LOG(LS_VERBOSE) << "request:" << req_info->request_uri << " "<< body <<" response:" << answer;
 
 				mg_printf(conn,"HTTP/1.1 200 OK\r\n");
 				mg_printf(conn,"Access-Control-Allow-Origin: *\r\n");
@@ -76,8 +75,7 @@ class RequestHandler : public CivetHandler
 				mg_printf(conn,"Content-Length: %zd\r\n", answer.size());
 				mg_printf(conn,"Connection: close\r\n");
 				mg_printf(conn,"\r\n");
-				mg_printf(conn,answer.c_str());
-
+        mg_write(conn, answer.c_str(), answer.length());
 				ret = true;
 			}
 		}
@@ -130,14 +128,15 @@ std::string  HttpServerRequestHandler::getParam(const struct mg_request_info *re
 // admin commands require an auth token.
 bool HttpServerRequestHandler::isAdmin(const struct mg_request_info *req_info, const Json::Value & in)
 {
-  return auth_key.compare(getParam(req_info, in, "auth"))==0;
+  // no key, no auth
+  return !auth_key.length() || auth_key.compare(getParam(req_info, in, "auth"))==0;
 }
 
 bool HttpServerRequestHandler::hasToken(const struct mg_request_info *req_info, const Json::Value & in)
 {
   bool hasIt = m_webRtcServer->hasToken(getParam(req_info, in, "token"), getParam(req_info, in, "stream_name"));
   if (!hasIt)
-    std::cout << "no token: "<< req_info->request_uri <<" token="<< getParam(req_info, in, "token")<<" stream="<< getParam(req_info, in, "stream_name")<<std::endl;
+    RTC_LOG(LS_ERROR) << "no token: "<< req_info->request_uri <<" token="<< getParam(req_info, in, "token")<<" stream="<< getParam(req_info, in, "stream_name")<<std::endl;
 
   return true;
 }
@@ -151,8 +150,11 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 {
 
   prefix = "/webrtc-api";
-//  auth_key = "odie";
   auth_key = auth;
+  if (auth_key.length()==0)
+    RTC_LOG(LS_ERROR) << "admin authorization off";
+
+
 
 	// http api callbacks
 	m_func["/getMediaList"]          = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {

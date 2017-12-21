@@ -10,7 +10,7 @@ RUN pwd
 
 # Build
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends g++ autoconf automake libtool xz-utils libasound-dev \
+	&& apt-get install -y --no-install-recommends g++ autoconf automake libtool xz-utils libasound-dev gdb vim \
 	&& mkdir -p /webrtc && cd /webrtc \
 	&& fetch --nohooks webrtc \
 	&& gclient sync \
@@ -28,5 +28,6 @@ VOLUME /streamer
 EXPOSE 8000
 
 # Run when the container launches
-ENTRYPOINT [ "./streamer" ]
+# ENTRYPOINT [ "./streamer" ]
+ENTRYPOINT [ "/bin/bash" ]
 

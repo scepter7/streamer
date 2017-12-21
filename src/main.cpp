@@ -68,11 +68,13 @@ int main(int argc, char* argv[])
 				}
 			break;
 			case 'V':
-				std::cout << VERSION << std::endl;
+				std::cout << "SiteProxy streamer: "<< VERSION << std::endl;
+				std::cout << "built " << __DATE__ << " " __TIME__ << std::endl;
 				exit(0);
 			break;
 		}
 	}
+	std::cout << "SiteProxy streamer: "<< VERSION << " built " << __DATE__ << " " __TIME__ << std::endl;
 
 
 	rtc::LogMessage::LogToDebug((rtc::LoggingSeverity)logLevel);
@@ -96,6 +98,10 @@ int main(int argc, char* argv[])
 		std::vector<std::string> options;
 		options.push_back("listening_ports");
 		options.push_back(httpAddress);
+
+		options.push_back("access_control_allow_origin");
+		options.push_back("*");
+		
 
 		if (test)
 		{
