@@ -5,8 +5,14 @@ SYSROOT?=$(shell $(CC) -print-sysroot)
 SYSROOTOPT=--sysroot=$(SYSROOT)
 CFLAGS = -Wall -pthread -g -std=c++11 -Iinc $(SYSROOTOPT) $(CFLAGS_EXTRA)
 LDFLAGS = -pthread $(SYSROOTOPT)
-WEBRTCROOT?=../webrtc
-WEBRTCBUILD?=Release
+WEBRTCROOT?=webrtc
+#WEBRTCROOT?=../webrtc 
+#WEBRTCROOT?=/media/gera/User/develop/upwork/MykytaBakirov/chromium/src/third_party/webrtc 
+ifeq ($(TESTDEBUG),debug) 
+  WEBRTCBUILD?=Debug 
+else 
+  WEBRTCBUILD?=Release 
+endif
 PREFIX?=/usr
 
 GITVERSION=$(shell git describe --tags --always --dirty)

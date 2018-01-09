@@ -5,3 +5,6 @@ streamer
 .cproject
 .project
 .settings/
+depot_tools/
+webrtc/
+libWebRTC__Debug.a
