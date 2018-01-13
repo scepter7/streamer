@@ -15,37 +15,6 @@
 
 #include "PeerConnectionManager.h"
 #include "HttpServerRequestHandler.h"
-static void split(std::string &f)
-{
-std::string::size_type ch = f.rfind('#');
-std::string u=f;
-std::string typ = "";
-
-if (ch != std::string::npos)
-{
-	typ = f.substr(ch+1);
-	u = f.substr(0, ch);
-}
-std::cout << "u= "<< u << " typ="<<typ << std::endl;
-
-}
-
-
-static void test()
-{
-
-std::string t1 = "rtsp://foobar:554/blah1#bang";
-std::string t2 = "rtsp://foobar:554/blah2#";
-std::string t3 = "rtsp://foobar:554/blah3";
-std::string t4 = "#foobar";
-split(t1);
-split(t2);
-split(t3);
-split(t4);
-
-
-
-}
 
 
 /* ---------------------------------------------------------------------------
@@ -57,12 +26,10 @@ int main(int argc, char* argv[])
 	// const char* defaultlocalstunurl  = "0.0.0.0:3478";
 	const char* localstunurl  = NULL;
 	const char* stunurl       = "stun.l.google.com:19302";
-	int logLevel              = rtc::INFO;	// bhl rtc::LERROR, LS_VERBOSE;
+	int logLevel              = rtc::LS_ERROR;	// rtc::LS_INFO (2), rtc::LS_ERROR (4), LS_VERBOSE;
 
 
 	webrtc::AudioDeviceModule::AudioLayer audioLayer = webrtc::AudioDeviceModule::kDummyAudio;
-	// std::string apiPrefix="streamer_api/";
-	if (false) { test(); return 0; }
 
 	std::map<std::string,std::string> urlList;
 
@@ -138,9 +105,8 @@ int main(int argc, char* argv[])
 		{
 			options.push_back("document_root");
 			options.push_back("./html");
-			webRtcServer.addStream("Test", "rtsp://video:only@bhlowe.com/cam/realmonitor?channel=1&subtype=1");
+			webRtcServer.addStream("Test", "rtsp://video:only@bhlowe.com/cam/realmonitor?channel=1&subtype=1", "");
 			std::cout << "Starting in test mode.. adding test stream and using .html";
-
 		}
 
 		try {
