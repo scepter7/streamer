@@ -247,8 +247,7 @@ class PeerConnectionManager {
 
 		virtual const Json::Value getIceCandidateList(const std::string &peerid);
 		virtual const Json::Value addIceCandidate(const std::string &peerid, const Json::Value& jmessage);
-		virtual const Json::Value getVideoDeviceList();
-		virtual const Json::Value getAudioDeviceList();
+		// virtual const Json::Value getVideoDeviceList();
 		virtual const Json::Value getMediaList();
 		virtual const Json::Value hangUp(const std::string &peerid);
 		virtual const Json::Value call(const std::string &peerid, const std::string & videourl, const std::string & audiourl, const std::string & options, const Json::Value& jmessage);
@@ -279,7 +278,6 @@ class PeerConnectionManager {
 		std::string                                                               turnuser_;
 		std::string                                                               turnpass_;
 		std::map<std::string,std::string>                                   			urlList_;
-		std::map<std::string,std::string>                                         m_videoaudiomap;
 
 	public:
 
@@ -288,10 +286,10 @@ class PeerConnectionManager {
 
 		virtual bool hasToken(const std::string &token, const std::string &stream_name);
 
-		
+
 		virtual bool hasStream(const std::string &stream_name);
 		virtual const Json::Value listStreams();
-		virtual const Json::Value addStream(const std::string &stream_name, const std::string &url);
+		virtual const Json::Value addStream(const std::string &stream_name, const std::string &url, const std::string &transport);
 		virtual const Json::Value removeStream(const std::string &stream_name);
 
 		virtual const Json::Value addToken(const std::string &token, const std::string &stream_name);

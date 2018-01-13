@@ -8,3 +8,8 @@ streamer
 depot_tools/
 webrtc/
 libWebRTC__Debug.a
+libWebRTC__Release.a
+*.a
+live/
+libWebRTC__Release
+

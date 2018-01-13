@@ -5,7 +5,7 @@ SYSROOT?=$(shell $(CC) -print-sysroot)
 SYSROOTOPT=--sysroot=$(SYSROOT)
 CFLAGS = -Wall -pthread -g -std=c++11 -Iinc $(SYSROOTOPT) $(CFLAGS_EXTRA)
 LDFLAGS = -pthread $(SYSROOTOPT)
-WEBRTCROOT?=webrtc
+WEBRTCROOT?=/data/dev/webrtc
 #WEBRTCROOT?=../webrtc 
 #WEBRTCROOT?=/media/gera/User/develop/upwork/MykytaBakirov/chromium/src/third_party/webrtc 
 ifeq ($(TESTDEBUG),debug) 
@@ -121,7 +121,6 @@ live555:
 	wget http://www.live555.com/liveMedia/public/live555-latest.tar.gz -O - | tar xzf -
 	cd live && ./genMakefiles linux-gdb
 	make -C live CPLUSPLUS_COMPILER="$(CXX) -fno-rtti $(CFLAGS_EXTRA)" C_COMPILER=$(CC) LINK='$(CXX) -o' PREFIX=$(SYSROOT)$(PREFIX) install
-	rm -rf live
 
 ALSAVERSION=1.1.4.1
 alsa-lib:

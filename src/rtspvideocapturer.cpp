@@ -32,6 +32,10 @@ int decodeRTPTransport(const std::string & rtpTransportString)
 	} else if (rtpTransportString == "multicast") {
 		rtptransport = RTSPConnection::RTPUDPMULTICAST;
 	}
+
+	// TESTING.. BHL
+	// rtptransport = RTSPConnection::RTPOVERTCP;
+
 	return rtptransport;
 }
 
@@ -65,6 +69,9 @@ bool RTSPVideoCapturer::onNewSession(const char* id,const char* media, const cha
 				{
 					sdpstr.erase(pos);
 				}
+
+				RTC_LOG(INFO) << "(BHL) RTSPVideoCapturer::onNewSession sdpstr " << sdpstr;
+
 				webrtc::H264SpropParameterSets sprops;
 				if (sprops.DecodeSprop(sdpstr))
 				{
@@ -126,7 +133,7 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 				unsigned int fps=25;
 				RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData SPS set timing_info_present_flag:" << m_h264->sps->vui.timing_info_present_flag << " " << m_h264->sps->vui.time_scale << " " << m_h264->sps->vui.num_units_in_tick;
 				if (m_decoder.get()) {
-					if ( (GetCaptureFormat()->width != width) || (GetCaptureFormat()->height != height) )  {
+					if ( ((unsigned int) GetCaptureFormat()->width != width) || ((unsigned int) GetCaptureFormat()->height != height) )  {
 						RTC_LOG(INFO) << "format changed => set format from " << GetCaptureFormat()->width << "x" << GetCaptureFormat()->height	 << " to " << width << "x" << height;
 						m_decoder.reset(NULL);
 					}

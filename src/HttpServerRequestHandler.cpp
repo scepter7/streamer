@@ -161,6 +161,7 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 		return m_webRtcServer->getMediaList();
 	};
 
+#if 0
 	m_func["/getVideoDeviceList"]    = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
 		return m_webRtcServer->getVideoDeviceList();
 	};
@@ -168,6 +169,7 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 	m_func["/getAudioDeviceList"]    = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
 		return m_webRtcServer->getAudioDeviceList();
 	};
+#endif
 
 	m_func["/getIceServers"]         = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
     if (!hasToken(req_info, in)) return unauthorized();
@@ -183,7 +185,7 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 
 		if (req_info->query_string) {
           CivetServer::getParam(req_info->query_string, "peerid", peerid);
-          CivetServer::getParam(req_info->query_string, "url", url);
+          CivetServer::getParam(req_info->query_string, "url", url);    // streamID
           CivetServer::getParam(req_info->query_string, "audiourl", audiourl);
           CivetServer::getParam(req_info->query_string, "options", options);
         }
@@ -199,7 +201,9 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 	};
 
 	m_func["/createOffer"]           = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-		std::string peerid;
+    if (!isAdmin(req_info, in)) return unauthorized();  // admin only?
+
+    std::string peerid;
 		std::string url;
 		std::string audiourl;
 		std::string options;
@@ -226,7 +230,8 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 	};
 
 	m_func["/getPeerConnectionList"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-		return m_webRtcServer->getPeerConnectionList();
+    if (!isAdmin(req_info, in)) return unauthorized();
+	  return m_webRtcServer->getPeerConnectionList();
 	};
 
 	m_func["/getStreamList"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
@@ -266,11 +271,13 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
   };
 
   m_func["/test"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-		return m_webRtcServer->test();
+    if (!isAdmin(req_info, in)) return unauthorized();
+    return m_webRtcServer->test();
 	};
 
 
 	m_func["/help"]                  = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+    if (!isAdmin(req_info, in)) return unauthorized();
 		Json::Value answer;
 		for (auto it : m_func) {
 			answer.append(it.first);
