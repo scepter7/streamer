@@ -92,7 +92,6 @@ const Json::Value PeerConnectionManager::getMediaList()
 	for (auto url : urlList_) {
 		Json::Value media;
 		media["video"] = url.first;
-
 		value.append(media);
 	}
 
@@ -211,11 +210,12 @@ const Json::Value PeerConnectionManager::addIceCandidate(const std::string& peer
 
 /* ---------------------------------------------------------------------------
 ** create an offer for a call
+** Does not appear used by siteproxy.
 ** -------------------------------------------------------------------------*/
 const Json::Value PeerConnectionManager::createOffer(const std::string &peerid, const std::string & videourl, const std::string & audiourl, const std::string & options)
 {
 	Json::Value offer;
-	RTC_LOG(INFO) << __FUNCTION__ << " bhl video="<<videourl<< " audio="<<audiourl <<" options="<<options<<" peerid="<<peerid;
+	RTC_LOG(INFO) << __FUNCTION__ << " bhl createOffer video="<<videourl<< " audio="<<audiourl <<" options="<<options<<" peerid="<<peerid;
 
 	PeerConnectionObserver* peerConnectionObserver = this->CreatePeerConnection(peerid);
 	if (!peerConnectionObserver)
@@ -319,7 +319,7 @@ void PeerConnectionManager::setAnswer(const std::string &peerid, const Json::Val
 ** -------------------------------------------------------------------------*/
 const Json::Value PeerConnectionManager::call(const std::string & peerid, const std::string & videourl, const std::string & audiourl, const std::string & options, const Json::Value& jmessage)
 {
-	RTC_LOG(INFO) << __FUNCTION__;
+	RTC_LOG(INFO) << __FUNCTION__ <<" bhl PeerConnectionManager::call";
 	Json::Value answer;
 
 	std::string type;
@@ -683,10 +683,10 @@ rtc::scoped_refptr<webrtc::VideoTrackInterface> PeerConnectionManager::CreateVid
 			rtsp = videourl.substr(0, ch);
 		} else { rtsp = videourl; }
 
-		std::cout << "rtsp= "<< rtsp << " rtptransport="<<rtptransport << std::endl;
 
 
-		CivetServer::getParam(options, "rtptransport", rtptransport);
+		RTC_LOG(INFO) << "CreateVideoTrack rtsp= "<< rtsp << " rtptransport="<<rtptransport << std::endl;
+		// CivetServer::getParam(options, "rtptransport", rtptransport);
 
 
 		capturer.reset(new RTSPVideoCapturer(rtsp, timeout, rtptransport));
@@ -700,7 +700,7 @@ rtc::scoped_refptr<webrtc::VideoTrackInterface> PeerConnectionManager::CreateVid
 
 	if (!capturer)
 	{
-		RTC_LOG(LS_ERROR) << "Cannot create capturer video:" << videourl;
+		RTC_LOG(LS_ERROR) << " **** Cannot create capturer video:" << videourl;
 	}
 	else
 	{
@@ -728,22 +728,32 @@ rtc::scoped_refptr<webrtc::AudioTrackInterface> PeerConnectionManager::CreateAud
 
 /* ---------------------------------------------------------------------------
 **  Add a stream to a PeerConnection
+**  videourl  is the stream name (map key)
 ** -------------------------------------------------------------------------*/
 bool PeerConnectionManager::AddStreams(webrtc::PeerConnectionInterface* peer_connection, const std::string & videourl, const std::string & audiourl, const std::string & options)
 {
 	bool ret = false;
-	RTC_LOG(INFO) << "bhl AddStreams "<< videourl<<" options "<<options;
+	// RTC_LOG(INFO) << "bhl AddStreams videourl="<< videourl<<" audiourl="<<audiourl<< " options="<<options;
 
 	// look in urlmap
-	std::string video = videourl;
-	auto videoit = urlList_.find(video);
+	std::string video;
+	auto videoit = urlList_.find(videourl);
 	if (videoit != urlList_.end()) {
 		video = videoit->second;
 	}
-	std::string audio = audiourl;
-	auto audioit = urlList_.find(audio);
+
+	std::string audio;
+	auto audioit = urlList_.find(audiourl);
 	if (audioit != urlList_.end()) {
 		audio = audioit->second;
+	}
+
+	RTC_LOG(INFO) << "bhl AddStreams videourl="<< videourl<<" audiourl="<<audiourl<< " options="<<options<<"  v2="+video;
+
+	if (video.empty())
+	{
+		RTC_LOG(LS_ERROR) << "bhl PeerConnectionManager::AddStreams failed for "<<videourl<< " list="<< listStreams();
+		return false;
 	}
 
 	// compute stream label removing space because SDP use label
@@ -831,20 +841,6 @@ void PeerConnectionManager::PeerConnectionObserver::OnIceCandidate(const webrtc:
 }
 
 
-	// BHL
-bool PeerConnectionManager::hasToken(const std::string &token, const std::string &stream_name)
- {
-	 bool has = hasStream(stream_name);
-	 assert(has);
-
-	 std::map<std::string,std::string>::iterator it = tokenMap.find(token);
-	 if (it != tokenMap.end())
-	 {
-		 	if (has && stream_name.compare(it->second)==0)
-				return true;
-	 }
-	 return false;
- }
 
 
  bool PeerConnectionManager::hasStream(const std::string &stream_name)
@@ -892,10 +888,8 @@ const Json::Value PeerConnectionManager::addStream(const std::string &stream_nam
 
 	if (!transport.empty())
 	{
-		std::string u;
-		u.append(url);
-		u.append("#");
-		u.append(transport);
+		std::string u = url;
+		u.append("#").append(transport);
 		RTC_LOG(INFO) << __FUNCTION__ << " bhl addStream with rtpTransport="<<u<< " transport="<<transport;
 		urlList_[stream_name]=u;
 	}
@@ -919,11 +913,28 @@ const Json::Value PeerConnectionManager::removeStream(const std::string &stream_
 	return error("stream_name not found");
 }
 
+// BHL
+bool PeerConnectionManager::hasToken(const std::string &token, const std::string &stream_name)
+{
+ bool has = hasStream(stream_name);
+ assert(has);
+
+ std::map<std::string,std::string>::iterator it = tokenMap.find(token);
+ if (it != tokenMap.end())
+ {
+		if (has && stream_name.compare(it->second)==0)
+			return true;
+ }
+ return false;
+}
 
 const Json::Value PeerConnectionManager::addToken(const std::string &token, const std::string &stream_name)
 {
 	RTC_LOG(LS_ERROR) << "addToken token:"<<token<< " stream:" << stream_name;
 	tokenMap.insert(std::pair<std::string, std::string >(token, stream_name));
+
+	assert(hasToken(token, stream_name));
+
 	return success();
 }
 

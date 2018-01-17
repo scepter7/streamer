@@ -41,7 +41,7 @@ int decodeRTPTransport(const std::string & rtpTransportString)
 
 RTSPVideoCapturer::RTSPVideoCapturer(const std::string & uri, int timeout, const std::string & rtptransport) : m_connection(m_env, this, uri.c_str(), timeout, decodeRTPTransport(rtptransport), 1)
 {
-	RTC_LOG(INFO) << "RTSPVideoCapturer" << uri ;
+	RTC_LOG(INFO) << "RTSPVideoCapturer" << uri << " transport " << rtptransport;
 	m_h264 = h264_new();
 }
 
@@ -114,6 +114,8 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 	ts = ts*1000 + presentationTime.tv_usec/1000;
 	RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData size:" << size << " ts:" << ts;
 	int res = 0;
+	bytesReceived += size;
+
 
 	if (m_codec == "H264") {
 		int nal_start = 0;
@@ -156,9 +158,11 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 				RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData PPS";
 				m_cfg.insert(m_cfg.end(), buffer, buffer+size);
 				break;
+
 			case NAL_UNIT_TYPE_AUD:
 			case NAL_UNIT_TYPE_SEI:	// these two nal units were causing warnings downstream in the webrtc Decoder code. Safe to ignore?
 				break;
+				
 			case NAL_UNIT_TYPE_CODED_SLICE_IDR:
 				if (m_decoder.get()) {
 					uint8_t buf[m_cfg.size() + size];
@@ -211,7 +215,7 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 				res = -1;
 			}
 		} else {
-			RTC_LOG(LS_ERROR) << "RTSPVideoCapturer:onData cannot JPEG dimension";
+			RTC_LOG(LS_ERROR) << "RTSPVideoCapturer:onData cannot determine JPEG dimension";
 			res = -1;
 		}
 
@@ -224,7 +228,7 @@ ssize_t RTSPVideoCapturer::onNewBuffer(unsigned char* buffer, ssize_t size)
 {
 	ssize_t markerSize = 0;
 	if (m_codec == "H264") {
-		if (size > sizeof(marker))
+		if (size > (ssize_t) sizeof(marker))
 		{
 			memcpy( buffer, marker, sizeof(marker) );
 			markerSize = sizeof(marker);

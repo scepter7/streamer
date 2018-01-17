@@ -246,7 +246,7 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 
   m_func["/addStream"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
     if (!isAdmin(req_info, in)) return unauthorized();
-    return m_webRtcServer->addStream(getParam(req_info, in, "stream_name"), getParam(req_info, in, "url"));
+    return m_webRtcServer->addStream(getParam(req_info, in, "stream_name"), getParam(req_info, in, "url"), getParam(req_info, in, "rtp_transport"));
   };
 
   m_func["/removeStream"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
@@ -292,14 +292,18 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 	};
 
 	m_func["/log"]                      = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-		std::string loglevel;
-		if (isAdmin(req_info, in)) {
+		if (isAdmin(req_info, in) && req_info->query_string) {
+      std::string loglevel;
 			CivetServer::getParam(req_info->query_string, "level", loglevel);
 			if (!loglevel.empty()) {
 				rtc::LogMessage::LogToDebug((rtc::LoggingSeverity)atoi(loglevel.c_str()));
 			}
 		}
-		Json::Value answer(rtc::LogMessage::GetLogToDebug());
+
+
+    rtc::LoggingSeverity level = rtc::LogMessage::GetLogToDebug();
+    int intVal = (int)level;
+		Json::Value answer(intVal);
 		return answer;
 	};
 
