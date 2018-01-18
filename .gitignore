@@ -12,4 +12,4 @@ libWebRTC__Release.a
 *.a
 live/
 libWebRTC__Release
-
+out

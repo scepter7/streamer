@@ -33,6 +33,9 @@ const char kCandidateSdpName[] = "candidate";
 const char kSessionDescriptionTypeName[] = "type";
 const char kSessionDescriptionSdpName[] = "sdp";
 
+#undef RTC_LOG
+#define RTC_LOG(x) std::cout
+
 /* ---------------------------------------------------------------------------
 **  Constructor
 ** -------------------------------------------------------------------------*/
@@ -583,6 +586,7 @@ const Json::Value PeerConnectionManager::getStreamList()
 	Json::Value value(Json::arrayValue);
 	for (auto it : stream_map_)
 	{
+		rtc::scoped_refptr<webrtc::MediaStreamInterface> stream  = it.second;
 		value.append(it.first);
 	}
 	return value;
@@ -757,7 +761,7 @@ bool PeerConnectionManager::AddStreams(webrtc::PeerConnectionInterface* peer_con
 	}
 
 	// compute stream label removing space because SDP use label
-	std::string streamLabel = video;
+	std::string streamLabel = videourl;		// BHL changed from video
 	streamLabel.erase(std::remove_if(streamLabel.begin(), streamLabel.end(), isspace), streamLabel.end());
 
 	std::map<std::string, rtc::scoped_refptr<webrtc::MediaStreamInterface> >::iterator it = stream_map_.find(streamLabel);
@@ -968,14 +972,26 @@ const Json::Value PeerConnectionManager::listTokens()
 const Json::Value PeerConnectionManager::test()
 {
 	Json::Value value(Json::arrayValue);
-	std::string err;
 
-	#if 0
-  if (hasStream("foo"))
-	{
-			Json::Value e("error");
+
+
+		for (auto it: peer_connectionobs_map_)
+		{
+			rtc::scoped_refptr<webrtc::PeerConnectionInterface> peerConnection = it.second->getPeerConnection();
+			rtc::scoped_refptr<webrtc::StreamCollectionInterface> localstreams (peerConnection->local_streams());
+			Json::Value e;
+			// e["signaling_state"] = peerConnection.signaling_state();
+			e["count"] = (int) localstreams->count();
 			value.append(e);
-	}
-#endif
+
+
+			for (unsigned int i = 0; i<localstreams->count(); i++)
+			{
+				localstreams->at(i)->label();
+
+			}
+		}
+
+
 	return value;
 }
