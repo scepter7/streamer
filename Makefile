@@ -4,7 +4,7 @@ AR=$(CROSS)ar
 SYSROOT?=$(shell $(CC) -print-sysroot)
 SYSROOTOPT=--sysroot=$(SYSROOT)
 CFLAGS = -Wall -pthread -g -std=c++11 -Iinc $(SYSROOTOPT) $(CFLAGS_EXTRA)
-LDFLAGS = -pthread $(SYSROOTOPT)
+LDFLAGS = -pthread $(SYSROOTOPT) -static-libstdc++
 WEBRTCROOT?=/data/dev/webrtc
 #WEBRTCROOT?=../webrtc 
 #WEBRTCROOT?=/media/gera/User/develop/upwork/MykytaBakirov/chromium/src/third_party/webrtc 

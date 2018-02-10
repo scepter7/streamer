@@ -117,9 +117,14 @@ class PeerConnectionManager {
 					}
 					m_report[stats.id()] = statsMembers;
 				}
+				// bhlowe
+				RTC_LOG(INFO) << __PRETTY_FUNCTION__ << " report:" << m_report;
+
 			}
 
 			Json::Value m_report;
+
+
 	};
 
 	class DataChannelObserver : public webrtc::DataChannelObserver  {

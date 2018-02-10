@@ -31,6 +31,8 @@ int main(int argc, char* argv[])
 	// LS_SENSITIVE, LS_VERBOSE, LS_INFO, LS_WARNING,
 
 	webrtc::AudioDeviceModule::AudioLayer audioLayer = webrtc::AudioDeviceModule::kDummyAudio;
+	std::cout << "info:"<<rtc::LS_INFO<< " err:"<< rtc::LS_ERROR<<" verbose:"<<  rtc::LS_VERBOSE;
+
 
 	std::map<std::string,std::string> urlList;
 

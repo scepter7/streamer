@@ -120,7 +120,7 @@ std::string  HttpServerRequestHandler::getParam(const struct mg_request_info *re
   }
 
   if (out.empty())
-    RTC_LOG(LS_ERROR) << "getParam "<<param<<" not found";
+    RTC_LOG(LS_ERROR) << "warning: getParam "<<param<<" not found";
   return out;
 }
 
@@ -296,15 +296,24 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
       std::string loglevel;
 			CivetServer::getParam(req_info->query_string, "level", loglevel);
 			if (!loglevel.empty()) {
-				rtc::LogMessage::LogToDebug((rtc::LoggingSeverity)atoi(loglevel.c_str()));
+        int l= atoi(loglevel.c_str();
+        if (l>=0 && l<=4)
+				    rtc::LogMessage::LogToDebug((rtc::LoggingSeverity)l));
 			}
 		}
 
-
     rtc::LoggingSeverity level = rtc::LogMessage::GetLogToDebug();
     int intVal = (int)level;
-		Json::Value answer(intVal);
-		return answer;
+		// Json::Value answer(intVal);
+    Json::Value content;
+    content["level"] = intVal;
+    content["LS_SENSITIVE"] = rtc::LS_SENSITIVE;
+    content["LS_VERBOSE"] = rtc::LS_VERBOSE;
+    content["LS_INFO"] = rtc::LS_INFO;
+    content["LS_WARNING"] = rtc::LS_WARNING;
+    content["LS_ERROR"] = rtc::LS_ERROR;
+
+		return content;
 	};
 
 	// register handlers

@@ -687,19 +687,10 @@ rtc::scoped_refptr<webrtc::VideoTrackInterface> PeerConnectionManager::CreateVid
 			rtsp = videourl.substr(0, ch);
 		} else { rtsp = videourl; }
 
-
-
 		RTC_LOG(INFO) << "CreateVideoTrack rtsp= "<< rtsp << " rtptransport="<<rtptransport << std::endl;
-		// CivetServer::getParam(options, "rtptransport", rtptransport);
-
-
+		// set capturer object.
 		capturer.reset(new RTSPVideoCapturer(rtsp, timeout, rtptransport));
-
-
-
-
 	}
-
 
 
 	if (!capturer)
@@ -950,8 +941,11 @@ const Json::Value PeerConnectionManager::removeToken(const std::string &token)
 	{
 		RTC_LOG(LS_ERROR) << "removeToken "<<token;
 		tokenMap.erase(it);
+		// disconnect the user.
+		hangUp(token);
+
 		return success();
-  }
+ 	 }
 
 	return error("token not found");
 }

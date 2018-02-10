@@ -21,6 +21,8 @@
 #include "rtspvideocapturer.h"
 
 uint8_t marker[] = { 0, 0, 0, 1};
+// #undef LS_VERBOSE
+// #define LS_VERBOSE LS_INFO
 
 int decodeRTPTransport(const std::string & rtpTransportString)
 {
@@ -162,7 +164,7 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 			case NAL_UNIT_TYPE_AUD:
 			case NAL_UNIT_TYPE_SEI:	// these two nal units were causing warnings downstream in the webrtc Decoder code. Safe to ignore?
 				break;
-				
+
 			case NAL_UNIT_TYPE_CODED_SLICE_IDR:
 				if (m_decoder.get()) {
 					uint8_t buf[m_cfg.size() + size];
