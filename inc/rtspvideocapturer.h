@@ -66,7 +66,8 @@ class RTSPVideoCapturer : public cricket::VideoCapturer, public RTSPConnection::
 		std::string                           m_codec;
     h264_stream_t*                        m_h264;
 		unsigned long bytesReceived;
-
+		unsigned long goodPackets, badPackets;
+		int m_prevType;
 };
 
 

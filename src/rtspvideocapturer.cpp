@@ -19,10 +19,12 @@
 #include "libyuv/convert.h"
 
 #include "rtspvideocapturer.h"
+#include <csignal> // bhl
 
 uint8_t marker[] = { 0, 0, 0, 1};
+
 // #undef LS_VERBOSE
-// #define LS_VERBOSE LS_INFO
+// #define LS_VERBOSE INFO
 
 int decodeRTPTransport(const std::string & rtpTransportString)
 {
@@ -45,10 +47,15 @@ RTSPVideoCapturer::RTSPVideoCapturer(const std::string & uri, int timeout, const
 {
 	RTC_LOG(INFO) << "RTSPVideoCapturer" << uri << " transport " << rtptransport;
 	m_h264 = h264_new();
+	bytesReceived=0;
+	goodPackets=0;
+	badPackets=0;
 }
 
 RTSPVideoCapturer::~RTSPVideoCapturer()
 {
+	RTC_LOG(INFO) << "~RTSPVideoCapturer" << this << " m_h264 " << m_h264;
+
 	h264_free(m_h264);
 }
 
@@ -107,6 +114,11 @@ bool RTSPVideoCapturer::onNewSession(const char* id,const char* media, const cha
 }
 
 
+void breaknow();
+void breaknow()
+{
+	RTC_LOG(INFO) << "breaknow";
+}
 
 
 
@@ -114,7 +126,7 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 {
 	int64_t ts = presentationTime.tv_sec;
 	ts = ts*1000 + presentationTime.tv_usec/1000;
-	RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData size:" << size << " ts:" << ts;
+	// RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData size:" << size << " ts:" << ts;
 	int res = 0;
 	bytesReceived += size;
 
@@ -124,27 +136,31 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 		int nal_end   = 0;
 		find_nal_unit(buffer, size, &nal_start, &nal_end);
 		read_nal_unit(m_h264, &buffer[nal_start], nal_end - nal_start);
+		m_prevType = m_h264->nal->nal_unit_type;
+
 		switch(m_h264->nal->nal_unit_type)
 		{
 			case NAL_UNIT_TYPE_SPS:
 			{
-				RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData SPS";
+				// RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData SPS";
 				m_cfg.clear();
 				m_cfg.insert(m_cfg.end(), buffer, buffer+size);
 
 				unsigned int width = ((m_h264->sps->pic_width_in_mbs_minus1 +1)*16) - m_h264->sps->frame_crop_left_offset*2 - m_h264->sps->frame_crop_right_offset*2;
 				unsigned int height= ((2 - m_h264->sps->frame_mbs_only_flag)* (m_h264->sps->pic_height_in_map_units_minus1 +1) * 16) - (m_h264->sps->frame_crop_top_offset * 2) - (m_h264->sps->frame_crop_bottom_offset * 2);
 				unsigned int fps=25;
-				RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData SPS set timing_info_present_flag:" << m_h264->sps->vui.timing_info_present_flag << " " << m_h264->sps->vui.time_scale << " " << m_h264->sps->vui.num_units_in_tick;
+				//RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData SPS set timing_info_present_flag:" << m_h264->sps->vui.timing_info_present_flag << " " << m_h264->sps->vui.time_scale << " " << m_h264->sps->vui.num_units_in_tick;
 				if (m_decoder.get()) {
 					if ( ((unsigned int) GetCaptureFormat()->width != width) || ((unsigned int) GetCaptureFormat()->height != height) )  {
 						RTC_LOG(INFO) << "format changed => set format from " << GetCaptureFormat()->width << "x" << GetCaptureFormat()->height	 << " to " << width << "x" << height;
 						m_decoder.reset(NULL);
+						RTC_LOG(INFO) << "RTSPVideoCapturer:onData resetting decoder.";
+
 					}
 				}
 
 				if (!m_decoder.get()) {
-					RTC_LOG(INFO) << "RTSPVideoCapturer:onData SPS set format " << width << "x" << height << " fps:" << fps;
+					//RTC_LOG(INFO) << "RTSPVideoCapturer:onData SPS set format " << width << "x" << height << " fps:" << fps;
 					cricket::VideoFormat videoFormat(width, height, cricket::VideoFormat::FpsToInterval(fps), cricket::FOURCC_I420);
 					SetCaptureFormat(&videoFormat);
 
@@ -157,13 +173,11 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 			}
 				break;
 			case NAL_UNIT_TYPE_PPS:
-				RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData PPS";
+				// RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData PPS";
 				m_cfg.insert(m_cfg.end(), buffer, buffer+size);
 				break;
 
-			case NAL_UNIT_TYPE_AUD:
-			case NAL_UNIT_TYPE_SEI:	// these two nal units were causing warnings downstream in the webrtc Decoder code. Safe to ignore?
-				break;
+
 
 			case NAL_UNIT_TYPE_CODED_SLICE_IDR:
 				if (m_decoder.get()) {
@@ -172,19 +186,49 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 					memcpy(buf+m_cfg.size(), buffer, size);
 					webrtc::EncodedImage input_image(buf, sizeof(buf), sizeof(buf) + webrtc::EncodedImage::GetBufferPaddingBytes(webrtc::VideoCodecType::kVideoCodecH264));
 					input_image._timeStamp = ts*1000;
-					RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData IDR ts="<<(ts*1000);
+					//RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData IDR ts="<<(ts*1000);
 					res = m_decoder->Decode(input_image, false, NULL);
+					if (res!=0)
+					{
+						RTC_LOG(INFO) << "RTSPVideoCapturer:onData decode failed NAL_UNIT_TYPE_CODED_SLICE_IDR :" << m_h264->nal->nal_unit_type;
+
+					}
+
 				} else 	{
-					RTC_LOG(LS_ERROR) << "RTSPVideoCapturer:onData no decoder";
+					//RTC_LOG(LS_ERROR) << "RTSPVideoCapturer:onData no decoder";
 					res = -1;
 				}
 				break;
+
+			case NAL_UNIT_TYPE_AUD:
+			case NAL_UNIT_TYPE_SEI:	// these two nal units were causing warnings downstream in the webrtc Decoder code. Safe to ignore?
+
 			default:
 				if (m_decoder.get()) {
 					webrtc::EncodedImage input_image(buffer, size, size + webrtc::EncodedImage::GetBufferPaddingBytes(webrtc::VideoCodecType::kVideoCodecH264));
 					input_image._timeStamp = ts*1000;
-					RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData SLICE NALU:" << m_h264->nal->nal_unit_type << " ts=" << input_image._timeStamp;
+					//RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData SLICE NALU:" << m_h264->nal->nal_unit_type << " ts=" << input_image._timeStamp;
 					res = m_decoder->Decode(input_image, false, NULL);
+					#if 1
+					if (res!=0)
+					{
+						//std::raise(SIGINT);
+						breaknow();
+						int retry = m_decoder->Decode(input_image, false, NULL);
+						RTC_LOG(INFO) << "RTSPVideoCapturer:onData decode failed NALU:" << m_h264->nal->nal_unit_type << " res="<<res<<" m_prevType=" << m_prevType << " retry ="<<retry;
+						breaknow();
+
+
+					} 
+					else
+					{
+							if (badPackets<50)
+								RTC_LOG(INFO) << "RTSPVideoCapturer:onData default successNALU:" << m_h264->nal->nal_unit_type << " m_prevType=" << m_prevType;
+
+
+					}
+					#endif
+
 				}else 	{
 					RTC_LOG(LS_ERROR) << "RTSPVideoCapturer:onData no decoder";
 					res = -1;
@@ -222,6 +266,18 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 		}
 
 	}
+	if (res==0)
+	{
+		goodPackets++;
+	}
+	else
+	{
+		badPackets++;
+		if (badPackets <100 && (badPackets % 100==0) )
+		RTC_LOG(INFO) << "onData BHL bytesReceived=" << bytesReceived<<" goodPackets="<<goodPackets<<" badPackets="<<badPackets;
+	}
+
+
 
 	return (res == 0);
 }

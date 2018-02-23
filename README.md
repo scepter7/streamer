@@ -1,21 +1,20 @@
 streamer
 ===============
-H.264 RTSP to WebRTC server based on a fork of [WebRTC-streamer](https://github.com/mpromonet/webrtc-streamer). In progress!
+H.264 RTSP to WebRTC server based on a fork of [WebRTC-streamer](https://github.com/mpromonet/webrtc-streamer) with goal of RTSP H.264 from IP camera to webrtc.
 
+TODO: If flagged, send h.264 direct to client browser if flag is set. Otherwise do default method of decode/encode.
 
-TODO tasks
-===============
-Add -k to streamer command line arguments to set adminKey  
-Remove rtsp url from SDP
-Are we using the turn server? Currently set to turn:none:none@bhlowe.com -- Brad will turn off turn server and test.
-
+In progress!
 
 Added API calls to:
   Manage tokens for security access to streams
   Add/Delete h.264 RTSP streams
 
+Uses stream name to reference stream (prevents RTSP URL from going to SDP)
+Supports authentication allowing setting of token (currently same as peerID)
 
 It embeds a HTTP server that implements API and serve a simple HTML page that use them through AJAX.   
+Must be served through reverse proxy with https.
 
 The WebRTC signaling is implemented throught HTTP requests:
 
@@ -89,13 +88,6 @@ Usage
          	[url]              : url to register in the source list
         	-v[v[v]]           : verbosity
         	-V                 : print version
-
-
-Example
------
-
-[Live Demo](https://test.siteproxy.net/)
-[SiteProxy Demo](https://dev.siteproxy.net/)
 
 
 Docker image

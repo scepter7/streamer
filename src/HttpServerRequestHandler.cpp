@@ -286,9 +286,26 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 	};
 
 
-	m_func["/version"]                  = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+  m_func["/version"]                  = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
 		Json::Value answer(VERSION);
 		return answer;
+	};
+
+  // print something to the log.
+  m_func["/print"]                  = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+		if (isAdmin(req_info, in))
+    {
+      std::string msg = getParam(req_info, in, "msg");
+
+      if (!msg.empty())
+      {
+        // RTC_LOG(LS_VERBOSE) << "request:" << req_info->request_uri << " "<< body <<" response:" << answer;
+
+        RTC_LOG(LS_INFO) << "print:" << msg;
+        return m_webRtcServer->success();
+      }
+    }
+    return m_webRtcServer->error("bad request");
 	};
 
 	m_func["/log"]                      = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
@@ -296,9 +313,9 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
       std::string loglevel;
 			CivetServer::getParam(req_info->query_string, "level", loglevel);
 			if (!loglevel.empty()) {
-        int l= atoi(loglevel.c_str();
+        int l= atoi(loglevel.c_str());
         if (l>=0 && l<=4)
-				    rtc::LogMessage::LogToDebug((rtc::LoggingSeverity)l));
+				    rtc::LogMessage::LogToDebug((rtc::LoggingSeverity)l);
 			}
 		}
 
@@ -307,6 +324,7 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 		// Json::Value answer(intVal);
     Json::Value content;
     content["level"] = intVal;
+    // just informational..
     content["LS_SENSITIVE"] = rtc::LS_SENSITIVE;
     content["LS_VERBOSE"] = rtc::LS_VERBOSE;
     content["LS_INFO"] = rtc::LS_INFO;

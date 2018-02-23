@@ -13,3 +13,5 @@ libWebRTC__Release.a
 live/
 libWebRTC__Release
 out
+        libWebRTC__Debug
+

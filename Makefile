@@ -1,3 +1,4 @@
+# TESTDEBUG=debug
 CC=$(CROSS)gcc
 CXX=$(CROSS)g++
 AR=$(CROSS)ar
