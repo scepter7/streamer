@@ -11,7 +11,8 @@ libWebRTC__Debug.a
 libWebRTC__Release.a
 *.a
 live/
-libWebRTC__Release
+libWebRTC__*
 out
-        libWebRTC__Debug
+cscope.out
+live555
 
