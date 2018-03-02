@@ -25,6 +25,37 @@
 
 class PeerConnectionManager {
 
+	// BHL
+	class RTSPStream : public rtc::RefCountInterface
+	{
+
+		public:
+			RTSPStream(std::string id) // :id(id)
+			{
+				this->id = id;
+			}
+
+			const std::string id;
+			rtc::scoped_refptr<webrtc::VideoTrackInterface> video_track;
+			rtc::scoped_refptr<webrtc::AudioTrackInterface> audio_track;
+			rtc::scoped_refptr<webrtc::MediaStreamInterface> stream;
+			std::unique_ptr<cricket::VideoCapturer> video_capturer;
+			class RTSPVideoCapturer * rtspvideocapturer;
+			int timeout;
+			std::string error;
+			void setError(const std::string& e)
+			{
+				RTC_LOG(LS_ERROR) << __PRETTY_FUNCTION__ << " RTSPStream error :" << e;
+				error = e;
+			}
+
+		protected:
+		// the destructor may be called from any thread.
+		~RTSPStream() {
+			RTC_LOG(LS_ERROR) << __PRETTY_FUNCTION__ << " ~RTSPStream:" << id;
+		}
+	};
+
 
 
 	class VideoSink : public rtc::VideoSinkInterface<webrtc::VideoFrame> {
@@ -118,7 +149,7 @@ class PeerConnectionManager {
 					m_report[stats.id()] = statsMembers;
 				}
 				// bhlowe
-				RTC_LOG(INFO) << __PRETTY_FUNCTION__ << " report:" << m_report;
+				RTC_LOG(INFO) << __PRETTY_FUNCTION__ << " BHL: report:" << m_report;
 
 			}
 
@@ -152,6 +183,9 @@ class PeerConnectionManager {
 		protected:
 			rtc::scoped_refptr<webrtc::DataChannelInterface>    m_dataChannel;
 	};
+
+
+
 
 	class PeerConnectionObserver : public webrtc::PeerConnectionObserver {
 		public:
@@ -255,7 +289,7 @@ class PeerConnectionManager {
 		// virtual const Json::Value getVideoDeviceList();
 		virtual const Json::Value getMediaList();
 		virtual const Json::Value hangUp(const std::string &peerid);
-		virtual const Json::Value call(const std::string &peerid, const std::string & videourl, const std::string & audiourl, const std::string & options, const Json::Value& jmessage);
+		virtual const Json::Value call(const std::string &peerid, const std::string & streamID, const std::string & options, const Json::Value& jmessage);
 		virtual const Json::Value getIceServers(const std::string& clientIp);
 		virtual const Json::Value getPeerConnectionList();
 		virtual const Json::Value getStreamList();
@@ -264,20 +298,42 @@ class PeerConnectionManager {
 		const Json::Value createOffer(const std::string &peerid, const std::string & videourl, const std::string & audiourl, const std::string & options);
 		void              setAnswer(const std::string &peerid, const Json::Value& jmessage);
 
-
 	protected:
 		PeerConnectionObserver*                 CreatePeerConnection(const std::string& peerid);
-		bool                                    AddStreams(webrtc::PeerConnectionInterface* peer_connection, const std::string & videourl, const std::string & audiourl, const std::string & options);
+		bool                                    AddStream(webrtc::PeerConnectionInterface* peer_connection, const std::string & streamID, const std::string & options);
+
+
+		bool attachStream(webrtc::PeerConnectionInterface* peer_connection, const std::string & streamID);
+
+
+		// bhl
+		rtc::scoped_refptr<PeerConnectionManager::RTSPStream> getRTSPStream(const std::string & streamLabel, const std::string & options);
+
+		bool      AddRTSPStream(webrtc::PeerConnectionInterface* peer_connection, const std::string & streamID, const std::string & options);
+		// rtc::scoped_refptr<webrtc::VideoTrackInterface> CreateRTSPStream(const std::string & videourl, const std::string & options);
+
+
 		rtc::scoped_refptr<webrtc::VideoTrackInterface> CreateVideoTrack(const std::string & videourl, const std::string & options);
 		rtc::scoped_refptr<webrtc::AudioTrackInterface> CreateAudioTrack(const std::string & audiourl, const std::string & options);
-		bool                                    streamStillUsed(const std::string & streamLabel);
+
+		rtc::scoped_refptr<RTSPStream> CreateRTSPStream(const std::string & id, const std::string & rtspURL, const std::string & options);
+
+
+		bool  				streamStillUsed(const std::string & streamLabel);
 
 	protected:
 		rtc::scoped_refptr<webrtc::AudioDeviceModule>                             audioDeviceModule_;
 		rtc::scoped_refptr<webrtc::AudioDecoderFactory>                           audioDecoderfactory_;
 		rtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface>                peer_connection_factory_;
 		std::map<std::string, PeerConnectionObserver* >                           peer_connectionobs_map_;
+
+
+
+		std::map<std::string, rtc::scoped_refptr<RTSPStream> >                   rtsp_map_;		// bhl123
 		std::map<std::string, rtc::scoped_refptr<webrtc::MediaStreamInterface> >  stream_map_;
+
+
+
 		std::string                                                               stunurl_;
 		std::string                                                               turnurl_;
 		std::string                                                               turnuser_;
