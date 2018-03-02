@@ -26,7 +26,7 @@ int main(int argc, char* argv[])
 	// const char* defaultlocalstunurl  = "0.0.0.0:3478";
 	const char* localstunurl  = NULL;
 	const char* stunurl       = "stun.l.google.com:19302";
-	int logLevel              = rtc::LS_VERBOSE;	// rtc::LS_INFO (2), rtc::LS_ERROR (4), LS_VERBOSE;
+	int logLevel              = rtc::LS_ERROR;	// rtc::LS_INFO (2), rtc::LS_ERROR (4), LS_VERBOSE;
   // LS_ERROR, LS_NONE, INFO = LS_INFO, WARNING = LS_WARNING,
 	// LS_SENSITIVE, LS_VERBOSE, LS_INFO, LS_WARNING,
 

@@ -211,6 +211,9 @@ const Json::Value PeerConnectionManager::addIceCandidate(const std::string& peer
 	return answer;
 }
 
+
+
+
 /* ---------------------------------------------------------------------------
 ** create an offer for a call
 ** Does not appear used by siteproxy.
@@ -219,7 +222,7 @@ const Json::Value PeerConnectionManager::createOffer(const std::string &peerid, 
 {
 	Json::Value offer;
 	RTC_LOG(INFO) << __FUNCTION__ << " bhl createOffer video="<<videourl<< " audio="<<audiourl <<" options="<<options<<" peerid="<<peerid;
-
+#if 0
 	PeerConnectionObserver* peerConnectionObserver = this->CreatePeerConnection(peerid);
 	if (!peerConnectionObserver)
 	{
@@ -279,6 +282,7 @@ const Json::Value PeerConnectionManager::createOffer(const std::string &peerid, 
 			RTC_LOG(LERROR) << "Failed to create offer";
 		}
 	}
+	#endif
 	return offer;
 }
 
@@ -320,7 +324,7 @@ void PeerConnectionManager::setAnswer(const std::string &peerid, const Json::Val
 /* ---------------------------------------------------------------------------
 **  auto-answer to a call
 ** -------------------------------------------------------------------------*/
-const Json::Value PeerConnectionManager::call(const std::string & peerid, const std::string & videourl, const std::string & audiourl, const std::string & options, const Json::Value& jmessage)
+const Json::Value PeerConnectionManager::call(const std::string & peerid, const std::string & streamID, const std::string & options, const Json::Value& jmessage)
 {
 	RTC_LOG(INFO) << __FUNCTION__ <<" bhl PeerConnectionManager::call";
 	Json::Value answer;
@@ -375,11 +379,33 @@ const Json::Value PeerConnectionManager::call(const std::string & peerid, const 
 				peerConnection->SetRemoteDescription(SetSessionDescriptionObserver::Create(peerConnection), session_description);
 			}
 
-			// add local stream
-			if (!this->AddStreams(peerConnection, videourl, audiourl, options))
+
+
+			#if 0
+			if (!this->AddStream(peerConnection, streamID, options))
 			{
-				RTC_LOG(WARNING) << "Can't add stream";
+				return this->error("Can't add stream");
 			}
+			#else
+
+			rtc::scoped_refptr<PeerConnectionManager::RTSPStream> rtsp_stream = getRTSPStream(streamID, options);
+
+			if (!rtsp_stream.get())
+			{
+				return this->error("Can't add rtsp_stream ");
+			}
+
+			if (!peerConnection->AddStream(rtsp_stream->stream))
+			{
+				RTC_LOG(LS_ERROR) << "Adding stream to PeerConnection failed";
+				return this->error("peerConnection->AddStream failed ");
+			}
+
+			// attachStream(peerConnection, rtsp_stream);
+
+
+			#endif
+			// add local stream
 
 			// create answer
 			webrtc::FakeConstraints constraints;
@@ -659,11 +685,107 @@ o=- 616753887671486577 2 IN IP4 127.0.0.1^M
 s=-^M
 #endif
 
+
+rtc::scoped_refptr<PeerConnectionManager::RTSPStream> PeerConnectionManager::CreateRTSPStream(const std::string & id, const std::string & rtspURL, const std::string & options)
+{
+
+	rtc::scoped_refptr<PeerConnectionManager::RTSPStream> stream = new rtc::RefCountedObject<PeerConnectionManager::RTSPStream>(id);
+	// PeerConnectionManager::RTSPStream * stream = new rtc::RefCountedObject<PeerConnectionStatsCollectorCallback>();
+
+
+	if (!rtspURL.find("rtsp://") == 0) return stream;
+
+	stream->timeout = 10;
+
+	// Create Video Track
+	RTC_LOG(INFO) << "PeerConnectionManager::CreateVideoTrack rtspURL:" << rtspURL << " options:" << options;
+	rtc::scoped_refptr<webrtc::VideoTrackInterface> video_track = NULL;
+
+
+
+	std::string tmp;
+	if (CivetServer::getParam(options, "timeout", tmp)) {
+		stream->timeout = std::stoi(tmp);
+	}
+
+	// added hack to allow rtp transport by adding #tcp, #http, or #multicast to rtsp url.
+	std::string::size_type ch = rtspURL.rfind('#');
+	std::string rtptransport;
+	std::string rtsp = "";
+
+	if (ch != std::string::npos)
+	{
+		rtptransport = rtspURL.substr(ch+1);
+		rtsp = rtspURL.substr(0, ch);
+	} else { rtsp = rtspURL; }
+
+	RTC_LOG(INFO) << "CreateVideoTrack rtsp= "<< rtsp << " rtptransport="<<rtptransport << std::endl;
+
+
+	stream->rtspvideocapturer = new RTSPVideoCapturer(rtsp, stream->timeout, rtptransport);
+	// set capturer object.
+	stream->video_capturer.reset(stream->rtspvideocapturer);
+
+
+
+
+	if (!stream->video_capturer)
+	{
+		RTC_LOG(LS_ERROR) << " **** Cannot create capturer video:" << rtspURL;
+		stream->setError("Cannot create capturer");
+	}
+	else
+	{
+		rtc::scoped_refptr<webrtc::VideoTrackSourceInterface> videoSource = peer_connection_factory_->CreateVideoSource(std::move(stream->video_capturer), NULL);
+		stream->video_track = peer_connection_factory_->CreateVideoTrack(kVideoLabel, videoSource);
+	}
+
+// create audio track
+
+	RTC_LOG(INFO) << "CreateAudioTrack: " << " options:" << options;
+
+	audioDeviceModule_->Terminate();
+	rtc::scoped_refptr<RTSPAudioSource> audioSource = RTSPAudioSource::Create(audioDecoderfactory_, rtspURL);
+	stream->audio_track = peer_connection_factory_->CreateAudioTrack(kAudioLabel, audioSource);
+
+
+
+	stream->stream = peer_connection_factory_->CreateLocalMediaStream(id);
+	if (!stream->stream.get())
+	{
+		RTC_LOG(LS_ERROR) << "Cannot create stream";
+		stream->setError("stream->stream.get failed");
+	}
+
+	if (!stream->stream->AddTrack(stream->video_track) )
+	{
+		stream->setError("VideoTrack to MediaStream failed");
+		RTC_LOG(LS_ERROR) << "Adding VideoTrack to MediaStream failed";
+	}
+
+	if ( (stream->audio_track) && (!stream->stream->AddTrack(stream->audio_track)) )
+	{
+		stream->setError("AudioTrack to MediaStream failed");
+		RTC_LOG(LS_ERROR) << "Adding AudioTrack to MediaStream failed";
+	}
+
+
+
+	stream_map_[id] = stream->stream;		// Eventually take out.
+
+
+
+	return stream;
+}
+
+
 /* ---------------------------------------------------------------------------
 **  get the capturer from its URL
 ** -------------------------------------------------------------------------*/
 rtc::scoped_refptr<webrtc::VideoTrackInterface> PeerConnectionManager::CreateVideoTrack(const std::string & videourl, const std::string & options)
 {
+
+
 	RTC_LOG(INFO) << "PeerConnectionManager::CreateVideoTrack videourl:" << videourl << " options:" << options;
 	rtc::scoped_refptr<webrtc::VideoTrackInterface> video_track = NULL;
 
@@ -721,38 +843,70 @@ rtc::scoped_refptr<webrtc::AudioTrackInterface> PeerConnectionManager::CreateAud
 	return audio_track;
 }
 
+#if 1
+// get existing, or create new RTSPStream
+rtc::scoped_refptr<PeerConnectionManager::RTSPStream> PeerConnectionManager::getRTSPStream(const std::string & streamLabel, const std::string & options)
+{
+	rtc::scoped_refptr<PeerConnectionManager::RTSPStream> ret;
+
+	auto rit = rtsp_map_.find(streamLabel);
+	if (rit != rtsp_map_.end()) {
+		ret = rit->second;
+	} else
+	{
+		// need to create it.
+
+		std::string rtspURL;
+		auto videoit = urlList_.find(streamLabel);
+		if (videoit != urlList_.end()) {
+			rtspURL = videoit->second;
+		}
+
+		RTC_LOG(INFO) << "bhl AddStreams streamLabel="<< streamLabel<<" rtspURL=" << rtspURL << " options="<<options;
+
+		if (rtspURL.empty())
+		{
+			RTC_LOG(LS_ERROR) << "bhl PeerConnectionManager::getRTSPStream failed for "<<streamLabel << " list="<< listStreams();
+			return ret;
+		}
+
+		ret = this->CreateRTSPStream(streamLabel, rtspURL, options);
+		rtsp_map_[streamLabel] = ret;
+	}
+
+	return ret;
+}
+
 /* ---------------------------------------------------------------------------
 **  Add a stream to a PeerConnection
 **  videourl  is the stream name (map key)
+**  BHL: To be depreciated.
 ** -------------------------------------------------------------------------*/
-bool PeerConnectionManager::AddStreams(webrtc::PeerConnectionInterface* peer_connection, const std::string & videourl, const std::string & audiourl, const std::string & options)
+bool PeerConnectionManager::AddStream(webrtc::PeerConnectionInterface* peer_connection, const std::string & streamID, const std::string & options)
 {
 	bool ret = false;
 	// RTC_LOG(INFO) << "bhl AddStreams videourl="<< videourl<<" audiourl="<<audiourl<< " options="<<options;
 
 	// look in urlmap
 	std::string video;
-	auto videoit = urlList_.find(videourl);
+	std::string audio;
+
+	auto videoit = urlList_.find(streamID);
 	if (videoit != urlList_.end()) {
 		video = videoit->second;
+		audio = video;
 	}
 
-	std::string audio;
-	auto audioit = urlList_.find(audiourl);
-	if (audioit != urlList_.end()) {
-		audio = audioit->second;
-	}
-
-	RTC_LOG(INFO) << "bhl AddStreams videourl="<< videourl<<" audiourl="<<audiourl<< " options="<<options<<"  v2="+video;
+	RTC_LOG(INFO) << "bhl AddStreams streamID="<< streamID<<" options="<<options<<"  v2="+video;
 
 	if (video.empty())
 	{
-		RTC_LOG(LS_ERROR) << "bhl PeerConnectionManager::AddStreams failed for "<<videourl<< " list="<< listStreams();
+		RTC_LOG(LS_ERROR) << "bhl PeerConnectionManager::AddStreams failed for "<<streamID<< " list="<< listStreams();
 		return false;
 	}
 
 	// compute stream label removing space because SDP use label
-	std::string streamLabel = videourl;		// BHL changed from video
+	std::string streamLabel = streamID;		// BHL changed from video
 	streamLabel.erase(std::remove_if(streamLabel.begin(), streamLabel.end(), isspace), streamLabel.end());
 
 	std::map<std::string, rtc::scoped_refptr<webrtc::MediaStreamInterface> >::iterator it = stream_map_.find(streamLabel);
@@ -764,6 +918,7 @@ bool PeerConnectionManager::AddStreams(webrtc::PeerConnectionInterface* peer_con
 				audio = video;
 			}
 		}
+
 
 		// need to create the stream
 		rtc::scoped_refptr<webrtc::VideoTrackInterface> video_track(this->CreateVideoTrack(video, options));
@@ -811,6 +966,8 @@ bool PeerConnectionManager::AddStreams(webrtc::PeerConnectionInterface* peer_con
 
 	return ret;
 }
+
+#endif
 
 /* ---------------------------------------------------------------------------
 **  ICE callback
@@ -905,7 +1062,7 @@ const Json::Value PeerConnectionManager::removeStream(const std::string &stream_
 		urlList_.erase(it);
 		return success();
   }
-	return error("stream_name not found");
+	return error("removeStream: stream_name not found");
 }
 
 // BHL

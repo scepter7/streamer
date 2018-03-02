@@ -178,18 +178,18 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 
 	m_func["/call"]                  = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
 		std::string peerid;
-		std::string url;
-		std::string audiourl;
+		std::string streamID;
+		// std::string audiourl;
 		std::string options;
     if (!hasToken(req_info, in)) return unauthorized();
 
 		if (req_info->query_string) {
           CivetServer::getParam(req_info->query_string, "peerid", peerid);
-          CivetServer::getParam(req_info->query_string, "url", url);    // streamID
-          CivetServer::getParam(req_info->query_string, "audiourl", audiourl);
+          CivetServer::getParam(req_info->query_string, "url", streamID);    // streamID
+          // CivetServer::getParam(req_info->query_string, "audiourl", audiourl);
           CivetServer::getParam(req_info->query_string, "options", options);
         }
-		return m_webRtcServer->call(peerid, url, audiourl, options, in);
+		return m_webRtcServer->call(peerid, streamID, options, in);
 	};
 
 	m_func["/hangup"]                = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
