@@ -1,4 +1,8 @@
 # TESTDEBUG=debug
+
+# Define SYSROOT to: /data/dev/webrtc/src/build/linux/debian_sid_amd64-sysroot
+# before building first time, run make live555
+
 CC=$(CROSS)gcc
 CXX=$(CROSS)g++
 AR=$(CROSS)ar
@@ -7,8 +11,8 @@ SYSROOTOPT=--sysroot=$(SYSROOT)
 CFLAGS = -Wall -pthread -g -std=c++11 -Iinc $(SYSROOTOPT) $(CFLAGS_EXTRA)
 LDFLAGS = -pthread $(SYSROOTOPT) -static-libstdc++
 WEBRTCROOT?=/data/dev/webrtc
-#WEBRTCROOT?=../webrtc 
-#WEBRTCROOT?=/media/gera/User/develop/upwork/MykytaBakirov/chromium/src/third_party/webrtc 
+
+
 ifeq ($(TESTDEBUG),debug) 
   WEBRTCBUILD?=Debug 
 else 

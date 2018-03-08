@@ -20,6 +20,12 @@
 #include "api/video_codecs/video_decoder.h"
 #include "media/base/videocapturer.h"
 #include "media/engine/internaldecoderfactory.h"
+#include "rtc_base/json.h"
+
+#include "pc/localaudiosource.h"
+#include "api/audio_codecs/builtin_audio_decoder_factory.h"
+#include <iostream>
+
 
 #include "h264_stream.h"
 
@@ -57,7 +63,15 @@ class RTSPVideoCapturer : public cricket::VideoCapturer, public RTSPConnection::
 		virtual bool IsRunning() { return this->capture_state() == cricket::CS_RUNNING; }
 
 
+
+		const Json::Value getJSON();
+
+
 	private:
+
+		// Json::Value json;
+
+
 		Environment                           m_env;
 		RTSPConnection                        m_connection;
 		webrtc::InternalDecoderFactory        m_factory;
@@ -69,11 +83,6 @@ class RTSPVideoCapturer : public cricket::VideoCapturer, public RTSPConnection::
 		unsigned long goodPackets, badPackets;
 		int m_prevType;
 };
-
-
-#include "pc/localaudiosource.h"
-#include "api/audio_codecs/builtin_audio_decoder_factory.h"
-#include <iostream>
 
 class RTSPAudioSource : public webrtc::Notifier<webrtc::AudioSourceInterface>, public rtc::Thread, public RTSPConnection::Callback {
 	public:

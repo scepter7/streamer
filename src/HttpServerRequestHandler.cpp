@@ -155,13 +155,13 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
     RTC_LOG(LS_ERROR) << "admin authorization off";
 
 
+#if 0
 
 	// http api callbacks
 	m_func["/getMediaList"]          = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
 		return m_webRtcServer->getMediaList();
 	};
 
-#if 0
 	m_func["/getVideoDeviceList"]    = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
 		return m_webRtcServer->getVideoDeviceList();
 	};

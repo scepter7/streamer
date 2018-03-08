@@ -78,7 +78,6 @@ int main(int argc, char* argv[])
 	}
 	std::cout << "SiteProxy streamer: "<< VERSION << " built " << __DATE__ << " " __TIME__ << std::endl;
 
-
 	rtc::LogMessage::LogToDebug((rtc::LoggingSeverity)logLevel);
 	rtc::LogMessage::LogTimestamps();
 	rtc::LogMessage::LogThreads();

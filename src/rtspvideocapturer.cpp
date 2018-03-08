@@ -43,10 +43,15 @@ int decodeRTPTransport(const std::string & rtpTransportString)
 	return rtptransport;
 }
 
-RTSPVideoCapturer::RTSPVideoCapturer(const std::string & uri, int timeout, const std::string & rtptransport) : m_connection(m_env, this, uri.c_str(), timeout, decodeRTPTransport(rtptransport), 1)
+RTSPVideoCapturer::RTSPVideoCapturer(const std::string & uri, int timeout, const std::string & rtptransport)
+	: m_connection(m_env, this, uri.c_str(), timeout, decodeRTPTransport(rtptransport), 1)
 {
 	RTC_LOG(INFO) << "RTSPVideoCapturer" << uri << " transport " << rtptransport;
 	m_h264 = h264_new();
+
+	// this->json["url"] = uri;
+	// json["transport"] = rtptransport;
+
 	bytesReceived=0;
 	goodPackets=0;
 	badPackets=0;
@@ -58,6 +63,18 @@ RTSPVideoCapturer::~RTSPVideoCapturer()
 
 	h264_free(m_h264);
 }
+
+
+const Json::Value RTSPVideoCapturer::getJSON()
+{
+	Json::Value json;
+	json["bytesReceived"] = (Json::Value::UInt64) bytesReceived;
+	json["goodPackets"] = (Json::Value::UInt64) goodPackets;
+	json["badPackets"] = (Json::Value::UInt64) badPackets;
+	return json;
+}
+
+
 
 bool RTSPVideoCapturer::onNewSession(const char* id,const char* media, const char* codec, const char* sdp)
 {
@@ -201,7 +218,9 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 				break;
 
 			case NAL_UNIT_TYPE_AUD:
-			case NAL_UNIT_TYPE_SEI:	// these two nal units were causing warnings downstream in the webrtc Decoder code. Safe to ignore?
+			case NAL_UNIT_TYPE_SEI:
+				// these two nal units were causing warnings downstream in the webrtc Decoder code. Safe to ignore?
+				// fallthrough.
 
 			default:
 				if (m_decoder.get()) {
@@ -213,13 +232,14 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 					if (res!=0)
 					{
 						//std::raise(SIGINT);
+						#if 0
 						breaknow();
 						int retry = m_decoder->Decode(input_image, false, NULL);
 						RTC_LOG(INFO) << "RTSPVideoCapturer:onData decode failed NALU:" << m_h264->nal->nal_unit_type << " res="<<res<<" m_prevType=" << m_prevType << " retry ="<<retry;
 						breaknow();
+						#endif
 
-
-					} 
+					}
 					else
 					{
 							if (badPackets<50)
@@ -319,6 +339,7 @@ void RTSPVideoCapturer::Stop()
 	rtc::Thread::Stop();
 	SetCaptureFormat(NULL);
 	SetCaptureState(cricket::CS_STOPPED);
+	RTC_LOG(INFO) << "RTSPVideoCapturer::Stop";
 }
 
 void RTSPVideoCapturer::Run()
