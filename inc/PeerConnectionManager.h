@@ -25,7 +25,7 @@
 
 class PeerConnectionManager {
 
-	// BHL
+	// represents a running (live) stream with viewer peers
 	class RTSPStream : public rtc::RefCountInterface
 	{
 
@@ -56,6 +56,35 @@ class PeerConnectionManager {
 			RTC_LOG(LS_ERROR) << __PRETTY_FUNCTION__ << " ~RTSPStream:" << id;
 		}
 	};
+
+	// represents a RTSP URL.
+	class RTSPSource : public rtc::RefCountInterface
+	{
+
+		public:
+			RTSPSource(std::string args) : args(args)
+			{
+			}
+
+		std::string get(const std::string key, const std::string def="")
+		{
+			std::string tmp;
+			if (CivetServer::getParam(args, key, tmp)) return tmp;
+			return def;
+		}
+		const std::string getID() { return get("id"); };	// unique id for stream
+		const std::string geURL() { return get("url"); };	// unique id for stream
+		const std::string geTransport() { return get("transport"); };	// unique id for stream
+
+		protected:
+			std::string args;
+
+		// the destructor may be called from any thread.
+		~RTSPSource() {
+			RTC_LOG(LS_ERROR) << __PRETTY_FUNCTION__ << " ~RTSPSource:" << id;
+		}
+	};
+
 
 
 
@@ -296,7 +325,7 @@ class PeerConnectionManager {
 		virtual const Json::Value getStreamList();
 
 
-		const Json::Value createOffer(const std::string &peerid, const std::string & videourl, const std::string & audiourl, const std::string & options);
+		// const Json::Value createOffer(const std::string &peerid, const std::string & videourl, const std::string & audiourl, const std::string & options);
 		void              setAnswer(const std::string &peerid, const Json::Value& jmessage);
 
 	protected:

@@ -198,78 +198,6 @@ const Json::Value PeerConnectionManager::addIceCandidate(const std::string& peer
 
 
 /* ---------------------------------------------------------------------------
-** create an offer for a call
-** Does not appear used by siteproxy.
-** -------------------------------------------------------------------------*/
-const Json::Value PeerConnectionManager::createOffer(const std::string &peerid, const std::string & videourl, const std::string & audiourl, const std::string & options)
-{
-	Json::Value offer;
-	RTC_LOG(INFO) << __FUNCTION__ << " bhl createOffer video="<<videourl<< " audio="<<audiourl <<" options="<<options<<" peerid="<<peerid;
-#if 0
-	PeerConnectionObserver* peerConnectionObserver = this->CreatePeerConnection(peerid);
-	if (!peerConnectionObserver)
-	{
-		RTC_LOG(LERROR) << "Failed to initialize PeerConnection";
-	}
-	else
-	{
-		rtc::scoped_refptr<webrtc::PeerConnectionInterface> peerConnection = peerConnectionObserver->getPeerConnection();
-
-		// set bandwidth
-		std::string tmp;
-		if (CivetServer::getParam(options, "bitrate", tmp)) {
-			int bitrate = std::stoi(tmp);
-
-			webrtc::PeerConnectionInterface::BitrateParameters bitrateParam;
-			bitrateParam.min_bitrate_bps = rtc::Optional<int>(bitrate/2);
-			bitrateParam.current_bitrate_bps = rtc::Optional<int>(bitrate);
-			bitrateParam.max_bitrate_bps = rtc::Optional<int>(bitrate*2);
-			peerConnection->SetBitrate(bitrateParam);
-
-			RTC_LOG(WARNING) << "set bitrate:" << bitrate;
-		}
-
-		if (!this->AddStreams(peerConnectionObserver->getPeerConnection(), videourl, audiourl, options))
-		{
-			RTC_LOG(WARNING) << "Can't add stream";
-		}
-
-		// register peerid
-		peer_connectionobs_map_.insert(std::pair<std::string, PeerConnectionObserver* >(peerid, peerConnectionObserver));
-
-		// ask to create offer
-		peerConnectionObserver->getPeerConnection()->CreateOffer(CreateSessionDescriptionObserver::Create(peerConnectionObserver->getPeerConnection()), NULL);
-
-		// waiting for offer
-		int count=10;
-		while ( (peerConnectionObserver->getPeerConnection()->local_description() == NULL) && (--count > 0) )
-		{
-			usleep(1000);
-		}
-
-		// answer with the created offer
-		const webrtc::SessionDescriptionInterface* desc = peerConnectionObserver->getPeerConnection()->local_description();
-		if (desc)
-		{
-			// TODO: Strip rtsp:// URL from desc.
-			// Do not want to expose details about IP/password of RTSP source.
-
-			std::string sdp;
-			desc->ToString(&sdp);
-
-			offer[kSessionDescriptionTypeName] = desc->type();
-			offer[kSessionDescriptionSdpName] = sdp;
-		}
-		else
-		{
-			RTC_LOG(LERROR) << "Failed to create offer";
-		}
-	}
-	#endif
-	return offer;
-}
-
-/* ---------------------------------------------------------------------------
 ** set answer to a call initiated by createOffer
 ** -------------------------------------------------------------------------*/
 void PeerConnectionManager::setAnswer(const std::string &peerid, const Json::Value& jmessage)
@@ -709,7 +637,6 @@ rtc::scoped_refptr<PeerConnectionManager::RTSPStream> PeerConnectionManager::Cre
 	if (CivetServer::getParam(options, "timeout", tmp)) {
 		stream->timeout = std::stoi(tmp);
 	}
-
 	// added hack to allow rtp transport by adding #tcp, #http, or #multicast to rtsp url.
 	std::string::size_type ch = rtspURL.rfind('#');
 	stream->transport="";
@@ -724,6 +651,14 @@ rtc::scoped_refptr<PeerConnectionManager::RTSPStream> PeerConnectionManager::Cre
 	RTC_LOG(INFO) << "CreateRTSPStream rtsp= "<< stream->url << " rtptransport=" << stream->transport << std::endl;
 
 	stream->rtspvideocapturer = new RTSPVideoCapturer(stream->url, stream->timeout, stream->transport);
+
+	int fps = 15;
+	if (CivetServer::getParam(options, "fps", tmp)) {
+		fps = std::stoi(tmp);
+	}
+
+	stream->rtspvideocapturer->fps = fps;
+
 	// set capturer object.
 	stream->video_capturer.reset(stream->rtspvideocapturer);
 

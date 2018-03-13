@@ -65,6 +65,8 @@ class RTSPVideoCapturer : public cricket::VideoCapturer, public RTSPConnection::
 
 
 		const Json::Value getJSON();
+		unsigned int fps=25;
+
 
 
 	private:
@@ -80,7 +82,7 @@ class RTSPVideoCapturer : public cricket::VideoCapturer, public RTSPConnection::
 		std::string                           m_codec;
     h264_stream_t*                        m_h264;
 		unsigned long bytesReceived;
-		unsigned long goodPackets, badPackets;
+		unsigned long goodPackets, badPackets, decodedFrames;
 		int m_prevType;
 };
 

@@ -51,10 +51,12 @@ RTSPVideoCapturer::RTSPVideoCapturer(const std::string & uri, int timeout, const
 
 	// this->json["url"] = uri;
 	// json["transport"] = rtptransport;
-
+  decodedFrames=0;
 	bytesReceived=0;
 	goodPackets=0;
 	badPackets=0;
+	fps = 25;
+	
 }
 
 RTSPVideoCapturer::~RTSPVideoCapturer()
@@ -71,6 +73,8 @@ const Json::Value RTSPVideoCapturer::getJSON()
 	json["bytesReceived"] = (Json::Value::UInt64) bytesReceived;
 	json["goodPackets"] = (Json::Value::UInt64) goodPackets;
 	json["badPackets"] = (Json::Value::UInt64) badPackets;
+	json["decodedFrames"] = (Json::Value::UInt64) decodedFrames;
+
 	return json;
 }
 
@@ -165,7 +169,6 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 
 				unsigned int width = ((m_h264->sps->pic_width_in_mbs_minus1 +1)*16) - m_h264->sps->frame_crop_left_offset*2 - m_h264->sps->frame_crop_right_offset*2;
 				unsigned int height= ((2 - m_h264->sps->frame_mbs_only_flag)* (m_h264->sps->pic_height_in_map_units_minus1 +1) * 16) - (m_h264->sps->frame_crop_top_offset * 2) - (m_h264->sps->frame_crop_bottom_offset * 2);
-				unsigned int fps=25;
 				//RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData SPS set timing_info_present_flag:" << m_h264->sps->vui.timing_info_present_flag << " " << m_h264->sps->vui.time_scale << " " << m_h264->sps->vui.num_units_in_tick;
 				if (m_decoder.get()) {
 					if ( ((unsigned int) GetCaptureFormat()->width != width) || ((unsigned int) GetCaptureFormat()->height != height) )  {
@@ -231,6 +234,10 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 					#if 1
 					if (res!=0)
 					{
+
+						RTC_LOG(INFO) << "RTSPVideoCapturer:onData default failed nal=" << m_h264->nal->nal_unit_type << " m_prevType=" << m_prevType<<" size="<<size;
+
+
 						//std::raise(SIGINT);
 						#if 0
 						breaknow();
@@ -317,6 +324,7 @@ ssize_t RTSPVideoCapturer::onNewBuffer(unsigned char* buffer, ssize_t size)
 
 int32_t RTSPVideoCapturer::Decoded(webrtc::VideoFrame& decodedImage)
 {
+	decodedFrames++;
 	if (decodedImage.timestamp_us() == 0) {
 		decodedImage.set_timestamp_us(decodedImage.timestamp());
 	}
