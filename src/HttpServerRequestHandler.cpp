@@ -134,9 +134,9 @@ bool HttpServerRequestHandler::isAdmin(const struct mg_request_info *req_info, c
 
 bool HttpServerRequestHandler::hasToken(const struct mg_request_info *req_info, const Json::Value & in)
 {
-  bool hasIt = m_webRtcServer->hasToken(getParam(req_info, in, "token"), getParam(req_info, in, "stream_name"));
+  bool hasIt = m_webRtcServer->hasToken(getParam(req_info, in, "token"), getParam(req_info, in, "id"));
   if (!hasIt)
-    RTC_LOG(LS_ERROR) << "no token: "<< req_info->request_uri <<" token="<< getParam(req_info, in, "token")<<" stream="<< getParam(req_info, in, "stream_name")<<std::endl;
+    RTC_LOG(LS_ERROR) << "no token: "<< req_info->request_uri <<" token="<< getParam(req_info, in, "token")<<" stream="<< getParam(req_info, in, "id")<<std::endl;
 
   return true;
 }
@@ -172,7 +172,8 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 #endif
 
 	m_func["/getIceServers"]         = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-    if (!hasToken(req_info, in)) return unauthorized();
+    if (!hasToken(req_info, in))
+      return unauthorized();
     return m_webRtcServer->getIceServers(req_info->remote_addr);
 	};
 
@@ -200,6 +201,7 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 		return m_webRtcServer->hangUp(peerid);
 	};
 
+#if 0
 	m_func["/createOffer"]           = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
     if (!isAdmin(req_info, in)) return unauthorized();  // admin only?
 
@@ -215,6 +217,9 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
         }
 		return m_webRtcServer->createOffer(peerid, url, audiourl, options);
 	};
+  #endif
+
+
 	m_func["/setAnswer"]             = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
 		m_webRtcServer->setAnswer(getParam(req_info, in, "peerid"), in);
 		Json::Value answer(1);
@@ -234,30 +239,43 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 	  return m_webRtcServer->getPeerConnectionList();
 	};
 
-	m_func["/getStreamList"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+	m_func["/getStreams"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
     if (!isAdmin(req_info, in)) return unauthorized();
-		return m_webRtcServer->getStreamList();
+		return m_webRtcServer->listStreams();
 	};
 
-  m_func["/listStreams"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+  m_func["/getSources"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
     if (!isAdmin(req_info, in)) return unauthorized();
-    return m_webRtcServer->listStreams();
+    return m_webRtcServer->listSources();
   };
 
-  m_func["/addStream"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+  m_func["/addSource"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
     if (!isAdmin(req_info, in)) return unauthorized();
-    return m_webRtcServer->addStream(getParam(req_info, in, "stream_name"), getParam(req_info, in, "url"), getParam(req_info, in, "rtp_transport"));
+    std::string id = getParam(req_info, in, "id");
+    std::string url = getParam(req_info, in, "url");
+    std::string transport = getParam(req_info, in, "transport");
+    rtc::scoped_refptr<RTSPSource> source = new rtc::RefCountedObject<RTSPSource>(id,url,transport);\
+    std::string timeout = getParam(req_info, in, "timeout");
+    if (!timeout.empty()) source->setTimeout(atoi(timeout.c_str()));
+
+
+    if (id.empty())
+      return m_webRtcServer->error("id required");
+    if (url.empty())
+      return m_webRtcServer->error("url required");
+
+    return m_webRtcServer->addSource(source); // req_info->query_string); // getParam(req_info, in, "id"), getParam(req_info, in, "url"), getParam(req_info, in, "rtp_transport"));
   };
 
-  m_func["/removeStream"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+  m_func["/removeSource"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
     if (!isAdmin(req_info, in)) return unauthorized();
-    return m_webRtcServer->removeStream(getParam(req_info, in, "stream_name"));
+    return m_webRtcServer->removeSource(getParam(req_info, in, "id"));
   };
 
-  // body:{"stream_name":"Macedo_WEBRTC_704x480","auth":"odie","token":"Macedo_WEBRTC_704x480_S10_OUOY"}
+  // body:{"id":"Macedo_WEBRTC_704x480","auth":"odie","token":"Macedo_WEBRTC_704x480_S10_OUOY"}
   m_func["/addToken"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
     if (!isAdmin(req_info, in)) return unauthorized();
-    return m_webRtcServer->addToken(getParam(req_info, in, "token"), getParam(req_info, in, "stream_name"));
+    return m_webRtcServer->addToken(getParam(req_info, in, "token"), getParam(req_info, in, "id"));
   };
 
   m_func["/removeToken"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
@@ -308,15 +326,16 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
     return m_webRtcServer->error("bad request");
 	};
 
-	m_func["/log"]                      = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-		if (isAdmin(req_info, in) && req_info->query_string) {
-      std::string loglevel;
-			CivetServer::getParam(req_info->query_string, "level", loglevel);
-			if (!loglevel.empty()) {
-        int l= atoi(loglevel.c_str());
+	m_func["/log"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
+
+    RTC_LOG(LS_INFO) << "set log level, admin" << isAdmin(req_info, in)<< " query="<<req_info->query_string;
+    std::string loglevel = getParam(req_info, in, "level");
+		if (isAdmin(req_info, in) && !loglevel.empty())
+    {
+        int l = atoi(loglevel.c_str());
+        RTC_LOG(LS_INFO) << "set log level:" << l;
         if (l>=0 && l<=4)
 				    rtc::LogMessage::LogToDebug((rtc::LoggingSeverity)l);
-			}
 		}
 
     rtc::LoggingSeverity level = rtc::LogMessage::GetLogToDebug();

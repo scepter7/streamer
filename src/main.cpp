@@ -34,8 +34,6 @@ int main(int argc, char* argv[])
 	std::cout << "info:"<<rtc::LS_INFO<< " err:"<< rtc::LS_ERROR<<" verbose:"<<  rtc::LS_VERBOSE;
 
 
-	std::map<std::string,std::string> urlList;
-
 	std::string httpAddress("0.0.0.0:");
 	std::string httpPort = "8000";
 	std::string authKey = "";
@@ -88,7 +86,7 @@ int main(int argc, char* argv[])
 
 
 	// webrtc server
-	PeerConnectionManager webRtcServer(stunurl, turnurl, urlList, audioLayer);
+	PeerConnectionManager webRtcServer(stunurl, turnurl, audioLayer);
 	if (!webRtcServer.InitializePeerConnection())
 	{
 		std::cout << "Cannot Initialize WebRTC server" << std::endl;
@@ -103,14 +101,16 @@ int main(int argc, char* argv[])
 		options.push_back("access_control_allow_origin");
 		options.push_back("*");
 
-
 		if (test)
 		{
 			options.push_back("document_root");
 			options.push_back("./html");
+			#if 0
 			webRtcServer.addStream("Test", "rtsp://video:only@bhlowe.com/cam/realmonitor?channel=1&subtype=1", "");
+			#endif
 			std::cout << "Starting in test mode.. adding test stream and using .html";
 		}
+
 
 		try {
 			std::cout << "HTTP Listen at " << httpAddress << std::endl;

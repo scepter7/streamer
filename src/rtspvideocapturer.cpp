@@ -43,10 +43,10 @@ int decodeRTPTransport(const std::string & rtpTransportString)
 	return rtptransport;
 }
 
-RTSPVideoCapturer::RTSPVideoCapturer(const std::string & uri, int timeout, const std::string & rtptransport)
-	: m_connection(m_env, this, uri.c_str(), timeout, decodeRTPTransport(rtptransport), 1)
+RTSPVideoCapturer::RTSPVideoCapturer(rtc::scoped_refptr<RTSPSource> source)
+	: m_connection(m_env, this, source->getURL().c_str(), source->getTimeout(), decodeRTPTransport(source->getTransport()), 1)
 {
-	RTC_LOG(INFO) << "RTSPVideoCapturer" << uri << " transport " << rtptransport;
+	RTC_LOG(INFO) << "RTSPVideoCapturer" << source->toString();
 	m_h264 = h264_new();
 
 	// this->json["url"] = uri;
@@ -55,8 +55,8 @@ RTSPVideoCapturer::RTSPVideoCapturer(const std::string & uri, int timeout, const
 	bytesReceived=0;
 	goodPackets=0;
 	badPackets=0;
-	fps = 25;
-	
+	fps = source->getFPS();
+
 }
 
 RTSPVideoCapturer::~RTSPVideoCapturer()

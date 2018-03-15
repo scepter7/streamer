@@ -26,13 +26,14 @@
 #include "api/audio_codecs/builtin_audio_decoder_factory.h"
 #include <iostream>
 
+#include "RTSPSource.h"
 
 #include "h264_stream.h"
 
 class RTSPVideoCapturer : public cricket::VideoCapturer, public RTSPConnection::Callback, public rtc::Thread, public webrtc::DecodedImageCallback
 {
 	public:
-		RTSPVideoCapturer(const std::string & uri, int timeout, const std::string & rtptransport);
+		RTSPVideoCapturer(rtc::scoped_refptr<RTSPSource> source);
 		virtual ~RTSPVideoCapturer();
 
 		// overide RTSPConnection::Callback

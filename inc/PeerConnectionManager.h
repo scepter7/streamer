@@ -21,70 +21,49 @@
 
 #include "rtc_base/logging.h"
 #include "rtc_base/json.h"
+#include "RTSPSource.h"
 
 
 class PeerConnectionManager {
+
+
+
+
 
 	// represents a running (live) stream with viewer peers
 	class RTSPStream : public rtc::RefCountInterface
 	{
 
 		public:
-			RTSPStream(std::string id) : id(id)
+			RTSPStream(rtc::scoped_refptr<RTSPSource> source) : source(source)
 			{
 			}
 
-			const std::string id;
+			const rtc::scoped_refptr<RTSPSource> source;
+
 			rtc::scoped_refptr<webrtc::VideoTrackInterface> video_track;
 			rtc::scoped_refptr<webrtc::AudioTrackInterface> audio_track;
 			rtc::scoped_refptr<webrtc::MediaStreamInterface> stream;
 			std::unique_ptr<cricket::VideoCapturer> video_capturer;
 			class RTSPVideoCapturer * rtspvideocapturer;
-			int timeout;
+
 			std::string error;
-			std::string url;
-			std::string transport;
+
 			void setError(const std::string& e)
 			{
 				RTC_LOG(LS_ERROR) << __PRETTY_FUNCTION__ << " RTSPStream error :" << e;
 				error = e;
 			}
 
+			std::string getID() { return source->getID(); };
+
+
 		protected:
 		// the destructor may be called from any thread.
 		~RTSPStream() {
-			RTC_LOG(LS_ERROR) << __PRETTY_FUNCTION__ << " ~RTSPStream:" << id;
+			RTC_LOG(LS_ERROR) << __PRETTY_FUNCTION__ << " ~RTSPStream:" << getID();
 		}
 	};
-
-	// represents a RTSP URL.
-	class RTSPSource : public rtc::RefCountInterface
-	{
-
-		public:
-			RTSPSource(std::string args) : args(args)
-			{
-			}
-
-		std::string get(const std::string key, const std::string def="")
-		{
-			std::string tmp;
-			if (CivetServer::getParam(args, key, tmp)) return tmp;
-			return def;
-		}
-		const std::string getID() { return get("id"); };	// unique id for stream
-		const std::string geURL() { return get("url"); };	// unique id for stream
-		const std::string geTransport() { return get("transport"); };	// unique id for stream
-
-		protected:
-			std::string args;
-
-		// the destructor may be called from any thread.
-		~RTSPSource() {
-			RTC_LOG(LS_ERROR) << __PRETTY_FUNCTION__ << " ~RTSPSource:" << id;
-		}
-	};
-
 
 
 
@@ -309,7 +288,7 @@ class PeerConnectionManager {
 	};
 
 	public:
-		PeerConnectionManager(const std::string & stunurl, const std::string & turnurl, const std::map<std::string,std::string> & urlList, const webrtc::AudioDeviceModule::AudioLayer audioLayer);
+		PeerConnectionManager(const std::string & stunurl, const std::string & turnurl, const webrtc::AudioDeviceModule::AudioLayer audioLayer);
 		virtual ~PeerConnectionManager();
 
 		bool InitializePeerConnection();
@@ -322,7 +301,6 @@ class PeerConnectionManager {
 		virtual const Json::Value call(const std::string &peerid, const std::string & streamID, const std::string & options, const Json::Value& jmessage);
 		virtual const Json::Value getIceServers(const std::string& clientIp);
 		virtual const Json::Value getPeerConnectionList();
-		virtual const Json::Value getStreamList();
 
 
 		// const Json::Value createOffer(const std::string &peerid, const std::string & videourl, const std::string & audiourl, const std::string & options);
@@ -334,23 +312,26 @@ class PeerConnectionManager {
 
 
 		bool attachStream(webrtc::PeerConnectionInterface* peer_connection, const std::string & streamID);
+		const Json::Value toJSON(rtc::scoped_refptr<RTSPSource> source);
+		const Json::Value toJSON(rtc::scoped_refptr<RTSPStream> stream);
 
 
 		// bhl
-		rtc::scoped_refptr<PeerConnectionManager::RTSPStream> getRTSPStream(const std::string & streamLabel, const std::string & options);
+		rtc::scoped_refptr<PeerConnectionManager::RTSPStream> getRTSPStream(const std::string & id, const std::string & options);
 
 		bool      AddRTSPStream(webrtc::PeerConnectionInterface* peer_connection, const std::string & streamID, const std::string & options);
 		// rtc::scoped_refptr<webrtc::VideoTrackInterface> CreateRTSPStream(const std::string & videourl, const std::string & options);
 
 
+		rtc::scoped_refptr<PeerConnectionManager::RTSPStream> CreateStream(rtc::scoped_refptr<RTSPSource> source, const std::string clientOptions);
 
-		rtc::scoped_refptr<RTSPStream> CreateRTSPStream(const std::string & id, const std::string & rtspURL, const std::string & options);
+
 		void closeStream(rtc::scoped_refptr<PeerConnectionManager::RTSPStream> stream);
 
-		rtc::scoped_refptr<PeerConnectionManager::RTSPStream> getStream(const std::string & streamLabel);
+		rtc::scoped_refptr<PeerConnectionManager::RTSPStream> getStream(const std::string & id);
 
 
-		bool  				streamStillUsed(const std::string & streamLabel);
+		bool  				streamStillUsed(const std::string & id);
 
 	protected:
 		rtc::scoped_refptr<webrtc::AudioDeviceModule>                             audioDeviceModule_;
@@ -360,7 +341,7 @@ class PeerConnectionManager {
 
 
 
-		std::map<std::string, rtc::scoped_refptr<RTSPStream> >                   rtsp_map_;		// bhl123
+		std::map<std::string, rtc::scoped_refptr<RTSPStream> >                   stream_map;		// bhl123
 		// std::map<std::string, rtc::scoped_refptr<webrtc::MediaStreamInterface> >  stream_map_;
 
 
@@ -369,22 +350,24 @@ class PeerConnectionManager {
 		std::string                                                               turnurl_;
 		std::string                                                               turnuser_;
 		std::string                                                               turnpass_;
-		std::map<std::string,std::string>                                   			urlList_;
+		std::map<std::string, rtc::scoped_refptr<RTSPSource> >                    sourceMap_;		// bhl, replaces sourceMap_
 
 	public:
 
-		std::map<std::string, std::string> tokenMap;		// token, stream_name		token is unique random string. stream_name is valid stream name/id
+		std::map<std::string, std::string> tokenMap;		// token, id		token is unique random string. id is valid stream name/id
 
 
-		virtual bool hasToken(const std::string &token, const std::string &stream_name);
+		virtual bool hasToken(const std::string &token, const std::string &id);
 
 
-		virtual bool hasStream(const std::string &stream_name);
+		virtual bool hasSource(const std::string &id);
 		virtual const Json::Value listStreams();
-		virtual const Json::Value addStream(const std::string &stream_name, const std::string &url, const std::string &transport);
-		virtual const Json::Value removeStream(const std::string &stream_name);
+		virtual const Json::Value listSources();
 
-		virtual const Json::Value addToken(const std::string &token, const std::string &stream_name);
+		virtual const Json::Value addSource(rtc::scoped_refptr<RTSPSource> source);
+		virtual const Json::Value removeSource(const std::string &id);
+
+		virtual const Json::Value addToken(const std::string &token, const std::string &id);
 		virtual const Json::Value removeToken(const std::string &token);
 		virtual const Json::Value listTokens();
 		static  const Json::Value error(const std::string &err);

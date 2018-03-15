@@ -2,6 +2,9 @@ streamer
 ===============
 H.264 RTSP to WebRTC server based on a fork of [WebRTC-streamer](https://github.com/mpromonet/webrtc-streamer) with goal of RTSP H.264 from IP camera to webrtc.
 
+This fork attempts to remove hardware video capture. It is only for RTSP/IP camera video.
+The HTML samples are not current-- the 
+
 TODO: If flagged, send h.264 direct to client browser if flag is set. Otherwise do default method of decode/encode.
 
 In progress!

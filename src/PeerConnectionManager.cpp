@@ -41,7 +41,7 @@ const char kSessionDescriptionSdpName[] = "sdp";
 /* ---------------------------------------------------------------------------
 **  Constructor
 ** -------------------------------------------------------------------------*/
-PeerConnectionManager::PeerConnectionManager(const std::string & stunurl, const std::string & turnurl, const std::map<std::string,std::string> & urlList, const webrtc::AudioDeviceModule::AudioLayer audioLayer)
+PeerConnectionManager::PeerConnectionManager(const std::string & stunurl, const std::string & turnurl, const webrtc::AudioDeviceModule::AudioLayer audioLayer)
 	: audioDeviceModule_(webrtc::AudioDeviceModule::Create(0, audioLayer))
 	, audioDecoderfactory_(webrtc::CreateBuiltinAudioDecoderFactory())
 	, peer_connection_factory_(webrtc::CreatePeerConnectionFactory(NULL,
@@ -54,7 +54,6 @@ PeerConnectionManager::PeerConnectionManager(const std::string & stunurl, const 
                                                                     NULL))
 	, stunurl_(stunurl)
 	, turnurl_(turnurl)
-	, urlList_(urlList)
 {
 	if (turnurl_.length() > 0)
 	{
@@ -351,7 +350,7 @@ const Json::Value PeerConnectionManager::call(const std::string & peerid, const 
 	return answer;
 }
 
-bool PeerConnectionManager::streamStillUsed(const std::string & streamLabel)
+bool PeerConnectionManager::streamStillUsed(const std::string & id)
 {
 	bool stillUsed = false;
 	for (auto it: peer_connectionobs_map_)
@@ -360,7 +359,7 @@ bool PeerConnectionManager::streamStillUsed(const std::string & streamLabel)
 		rtc::scoped_refptr<webrtc::StreamCollectionInterface> localstreams (peerConnection->local_streams());
 		for (unsigned int i = 0; i<localstreams->count(); i++)
 		{
-			if (localstreams->at(i)->label() == streamLabel)
+			if (localstreams->at(i)->label() == id)
 			{
 				stillUsed = true;
 				break;
@@ -387,8 +386,8 @@ void PeerConnectionManager::closeStream(rtc::scoped_refptr<PeerConnectionManager
 
 	media.release();
 
-	auto it = rtsp_map_.find(stream->id);
-	rtsp_map_.erase(it);
+	auto it = stream_map.find(stream->getID());
+	stream_map.erase(it);
 }
 
 /* ---------------------------------------------------------------------------
@@ -411,14 +410,14 @@ const Json::Value PeerConnectionManager::hangUp(const std::string &peerid)
 		Json::Value streams;
 		for (unsigned int i = 0; i<localstreams->count(); i++)
 		{
-			std::string streamLabel = localstreams->at(i)->label();
+			std::string id = localstreams->at(i)->label();
 
-			bool stillUsed = this->streamStillUsed(streamLabel);
+			bool stillUsed = this->streamStillUsed(id);
 			if (!stillUsed)
 			{
-				RTC_LOG(LS_ERROR) << "Close PeerConnection no more used " << streamLabel;
+				RTC_LOG(LS_ERROR) << "Close PeerConnection no more used " << id;
 				#if 0
-				std::map<std::string, rtc::scoped_refptr<webrtc::MediaStreamInterface> >::iterator it = stream_map_.find(streamLabel);
+				std::map<std::string, rtc::scoped_refptr<webrtc::MediaStreamInterface> >::iterator it = stream_map_.find(id);
 				if (it != stream_map_.end())
 				{
 					rtc::scoped_refptr<webrtc::MediaStreamInterface> media = it->second;
@@ -438,7 +437,7 @@ const Json::Value PeerConnectionManager::hangUp(const std::string &peerid)
 				}
 				#else
 
-					this->closeStream(getStream(streamLabel));
+					this->closeStream(getStream(id));
 
 				#endif
 
@@ -537,41 +536,23 @@ const Json::Value PeerConnectionManager::getPeerConnectionList()
 	return value;
 }
 
+
+
 /* ---------------------------------------------------------------------------
 **  get StreamList list
 ** -------------------------------------------------------------------------*/
-const Json::Value PeerConnectionManager::getStreamList()
+const Json::Value PeerConnectionManager::listStreams()
 {
 	Json::Value value(Json::arrayValue);
-	for (auto it : rtsp_map_)
+	for (auto it : stream_map)
 	{
-
 		rtc::scoped_refptr<PeerConnectionManager::RTSPStream> stream  = it.second;
-		Json::Value item;
-		item["id"]=stream->id;
-		item["error"]=stream->error;
-
-		if (stream->rtspvideocapturer)
-		{
-			item["rtsp_stream"] = stream->rtspvideocapturer->getJSON();
-		}
-		/*
-		item["xxx"]=xxx;
-		rtc::scoped_refptr<webrtc::VideoTrackInterface> video_track;
-		rtc::scoped_refptr<webrtc::AudioTrackInterface> audio_track;
-		rtc::scoped_refptr<webrtc::MediaStreamInterface> stream;
-		std::unique_ptr<cricket::VideoCapturer> video_capturer;
-		class RTSPVideoCapturer * rtspvideocapturer;
-		int timeout;
-		std::string error;
-*/
-
-
-			value.append(item);
+		Json::Value item = this->toJSON(stream);
+		item["id"]=stream->getID();
+		value.append(item);
 	}
 	return value;
 }
-
 
 
 /* ---------------------------------------------------------------------------
@@ -616,22 +597,25 @@ PeerConnectionManager::PeerConnectionObserver* PeerConnectionManager::CreatePeer
 
 
 
-rtc::scoped_refptr<PeerConnectionManager::RTSPStream> PeerConnectionManager::CreateRTSPStream(const std::string & id, const std::string & rtspURL, const std::string & options)
+rtc::scoped_refptr<PeerConnectionManager::RTSPStream> PeerConnectionManager::CreateStream(rtc::scoped_refptr<RTSPSource> source, std::string clientOptions)
 {
 
-	rtc::scoped_refptr<PeerConnectionManager::RTSPStream> stream = new rtc::RefCountedObject<PeerConnectionManager::RTSPStream>(id);
+	rtc::scoped_refptr<PeerConnectionManager::RTSPStream> stream = new rtc::RefCountedObject<PeerConnectionManager::RTSPStream>(source);
 	// PeerConnectionManager::RTSPStream * stream = new rtc::RefCountedObject<PeerConnectionStatsCollectorCallback>();
 
 
-	if (!rtspURL.find("rtsp://") == 0) return stream;
+	if (!source->getURL().find("rtsp://") == 0)
+	{
+			RTC_LOG(INFO) << "PeerConnectionManager::CreateStream bad URL:" << source->toString();
 
-	stream->timeout = 10;
+			return stream;	// error
+	}
 
 	// Create Video Track
-	RTC_LOG(INFO) << "PeerConnectionManager::CreateRTSPStream rtspURL:" << rtspURL << " options:" << options;
+	RTC_LOG(INFO) << "PeerConnectionManager::CreateStream rtspURL:" << source->toString();
 	rtc::scoped_refptr<webrtc::VideoTrackInterface> video_track = NULL;
 
-
+#if 0
 
 	std::string tmp;
 	if (CivetServer::getParam(options, "timeout", tmp)) {
@@ -648,16 +632,10 @@ rtc::scoped_refptr<PeerConnectionManager::RTSPStream> PeerConnectionManager::Cre
 		stream->url = rtspURL.substr(0, ch);
 	}
 
-	RTC_LOG(INFO) << "CreateRTSPStream rtsp= "<< stream->url << " rtptransport=" << stream->transport << std::endl;
-
+	RTC_LOG(INFO) << "CreateStream rtsp= "<< stream->url << " rtptransport=" << stream->transport << std::endl;
 	stream->rtspvideocapturer = new RTSPVideoCapturer(stream->url, stream->timeout, stream->transport);
-
-	int fps = 15;
-	if (CivetServer::getParam(options, "fps", tmp)) {
-		fps = std::stoi(tmp);
-	}
-
-	stream->rtspvideocapturer->fps = fps;
+#endif
+	stream->rtspvideocapturer = new RTSPVideoCapturer(source);
 
 	// set capturer object.
 	stream->video_capturer.reset(stream->rtspvideocapturer);
@@ -667,7 +645,7 @@ rtc::scoped_refptr<PeerConnectionManager::RTSPStream> PeerConnectionManager::Cre
 
 	if (!stream->video_capturer)
 	{
-		RTC_LOG(LS_ERROR) << " **** Cannot create capturer video:" << rtspURL;
+		RTC_LOG(LS_ERROR) << " **** Cannot create capturer video:" << source->toString();
 		stream->setError("Cannot create capturer");
 	}
 	else
@@ -678,15 +656,14 @@ rtc::scoped_refptr<PeerConnectionManager::RTSPStream> PeerConnectionManager::Cre
 
 // create audio track
 
-	RTC_LOG(INFO) << "CreateAudioTrack: " << " options:" << options;
 
 	audioDeviceModule_->Terminate();
-	rtc::scoped_refptr<RTSPAudioSource> audioSource = RTSPAudioSource::Create(audioDecoderfactory_, rtspURL);
+	rtc::scoped_refptr<RTSPAudioSource> audioSource = RTSPAudioSource::Create(audioDecoderfactory_, source->getURL());
 	stream->audio_track = peer_connection_factory_->CreateAudioTrack(kAudioLabel, audioSource);
 
 
 
-	stream->stream = peer_connection_factory_->CreateLocalMediaStream(id);
+	stream->stream = peer_connection_factory_->CreateLocalMediaStream(source->getID());
 	if (!stream->stream.get())
 	{
 		RTC_LOG(LS_ERROR) << "Cannot create stream";
@@ -710,42 +687,46 @@ rtc::scoped_refptr<PeerConnectionManager::RTSPStream> PeerConnectionManager::Cre
 }
 
 
-rtc::scoped_refptr<PeerConnectionManager::RTSPStream> PeerConnectionManager::getStream(const std::string & streamLabel)
+rtc::scoped_refptr<PeerConnectionManager::RTSPStream> PeerConnectionManager::getStream(const std::string & id)
 {
-	auto rit = rtsp_map_.find(streamLabel);
-	if (rit != rtsp_map_.end())
+	auto rit = stream_map.find(id);
+	if (rit != stream_map.end())
 		return  rit->second;
 	return NULL;
 }
 
 // get existing, or create new RTSPStream
-rtc::scoped_refptr<PeerConnectionManager::RTSPStream> PeerConnectionManager::getRTSPStream(const std::string & streamLabel, const std::string & options)
+rtc::scoped_refptr<PeerConnectionManager::RTSPStream> PeerConnectionManager::getRTSPStream(const std::string & id, const std::string & options)
 {
 	rtc::scoped_refptr<PeerConnectionManager::RTSPStream> ret;
 
-	auto rit = rtsp_map_.find(streamLabel);
-	if (rit != rtsp_map_.end()) {
+	auto rit = stream_map.find(id);
+	if (rit != stream_map.end()) {
 		ret = rit->second;
 	} else
 	{
 		// need to create it.
 
-		std::string rtspURL;
-		auto videoit = urlList_.find(streamLabel);
-		if (videoit != urlList_.end()) {
-			rtspURL = videoit->second;
-		}
 
-		RTC_LOG(INFO) << "bhl AddStreams streamLabel="<< streamLabel<<" rtspURL=" << rtspURL << " options="<<options;
+		rtc::scoped_refptr<RTSPSource> source;
+		std::map<std::string, rtc::scoped_refptr<RTSPSource> >::iterator  sourceit = sourceMap_.find(id);
 
-		if (rtspURL.empty())
-		{
-			RTC_LOG(LS_ERROR) << "bhl PeerConnectionManager::getRTSPStream failed for "<<streamLabel << " list="<< listStreams();
+		if (sourceit == sourceMap_.end()) {
+			RTC_LOG(LS_ERROR) << "bhl PeerConnectionManager::getRTSPStream failed for "<<id << " list="<< listSources();
 			return ret;
 		}
 
-		ret = this->CreateRTSPStream(streamLabel, rtspURL, options);
-		rtsp_map_[streamLabel] = ret;
+		source = sourceit->second;
+		RTC_LOG(INFO) << "bhl AddStreams id="<< id<<" source=" << source->toString() << " options="<<options;
+
+		if (source->getURL().empty())
+		{
+			RTC_LOG(LS_ERROR) << "bhl PeerConnectionManager::getRTSPStream failed for "<<id << " list="<< listSources();
+			return ret;
+		}
+
+		ret = this->CreateStream(source, options);
+		stream_map[id] = ret;
 	}
 
 	return ret;
@@ -778,9 +759,9 @@ void PeerConnectionManager::PeerConnectionObserver::OnIceCandidate(const webrtc:
 
 
 
-bool PeerConnectionManager::hasStream(const std::string &stream_name)
+bool PeerConnectionManager::hasSource(const std::string &id)
 {
-	int count = urlList_.count(stream_name);
+	int count = sourceMap_.count(id);
 	assert(count == 1 || count ==0);
 	return count >0;
 }
@@ -800,74 +781,102 @@ const Json::Value PeerConnectionManager::success()
 	return value;
 }
 
-const Json::Value PeerConnectionManager::listStreams()
+const Json::Value PeerConnectionManager::toJSON(rtc::scoped_refptr<RTSPStream> stream)
+{
+	Json::Value entry;
+
+	entry["error"]=stream->error;
+	if (stream->rtspvideocapturer)
+	{
+		entry["rtsp_stream"] = stream->rtspvideocapturer->getJSON();
+	}
+	return entry;
+}
+
+
+const Json::Value PeerConnectionManager::toJSON(rtc::scoped_refptr<RTSPSource> source)
+{
+	Json::Value entry;
+	entry["id"] = source->getID();
+	entry["url"] = source->getURL();
+	entry["transport"] = source->getTransport();
+	entry["timeout"] = source->getTimeout();
+	rtc::scoped_refptr<PeerConnectionManager::RTSPStream> stream = getStream(source->getID());
+	if (stream!=NULL)
+	{
+		entry["stream"] = this->toJSON(stream);
+	}
+
+
+	return entry;
+
+}
+const Json::Value PeerConnectionManager::listSources()
 {
 	Json::Value value(Json::arrayValue);
-	for (auto url : urlList_)
+	for (auto url : sourceMap_)
 	{
-		Json::Value entry;
-		entry["name"] = url.first;
-		entry["url"] = url.second;
-		value.append(entry);
+		rtc::scoped_refptr<RTSPSource> source = url.second;
+		value.append(toJSON(source));
 	}
 	return value;
 }
 
 
-const Json::Value PeerConnectionManager::addStream(const std::string &stream_name, const std::string &url, const std::string &transport)
+const Json::Value PeerConnectionManager::addSource(rtc::scoped_refptr<RTSPSource> source)
 {
-	if (hasStream("stream_name"))
+	if (hasSource(source->getID()))
 			return error("stream already defined");
+	if (source->getID().empty())
+ 		return error("id required");
+	if (source->getURL().empty())
+ 		return error("url required");
 
-	if (!transport.empty())
-	{
-		std::string u = url;
-		u.append("#").append(transport);
-		RTC_LOG(INFO) << __FUNCTION__ << " bhl addStream with rtpTransport="<<u<< " transport="<<transport;
-		urlList_[stream_name]=u;
-	}
-	else
-	{
-		urlList_[stream_name]=url;
-	}
-
-	return success();
+	sourceMap_[source->getID()]=source;
+	Json::Value reply = toJSON(source);
+	reply["success"] = true;
+	return reply;
 }
 
-const Json::Value PeerConnectionManager::removeStream(const std::string &stream_name)
+
+const Json::Value PeerConnectionManager::removeSource(const std::string &id)
 {
 	// TODO: Stop and remove the stream if it is "streaming".
-	std::map<std::string, std::string >::iterator  it = urlList_.find(stream_name);
-	if (it != urlList_.end())
+	std::map<std::string, rtc::scoped_refptr<RTSPSource> >::iterator  it = sourceMap_.find(id);
+	if (it != sourceMap_.end())
 	{
-		urlList_.erase(it);
+		sourceMap_.erase(it);
 		return success();
   }
-	return error("removeStream: stream_name not found");
+	return error("removeStream: id not found");
 }
 
+
 // BHL
-bool PeerConnectionManager::hasToken(const std::string &token, const std::string &stream_name)
+bool PeerConnectionManager::hasToken(const std::string &token, const std::string &id)
 {
- bool has = hasStream(stream_name);
+ bool has = hasSource(id);
  assert(has);
 
  std::map<std::string,std::string>::iterator it = tokenMap.find(token);
  if (it != tokenMap.end())
  {
-		if (has && stream_name.compare(it->second)==0)
+		if (has && id.compare(it->second)==0)
 			return true;
  }
  return false;
 }
 
-const Json::Value PeerConnectionManager::addToken(const std::string &token, const std::string &stream_name)
+const Json::Value PeerConnectionManager::addToken(const std::string &token, const std::string &id)
 {
-	RTC_LOG(LS_ERROR) << "addToken token:"<<token<< " stream:" << stream_name;
-	tokenMap.insert(std::pair<std::string, std::string >(token, stream_name));
+	if (token.empty()) return  error("addToken token empty");
+	if (id.empty()) return  error("addToken id empty");
+	if (!hasSource(id)) return error("addToken source not found");
 
-	assert(hasToken(token, stream_name));
 
+	RTC_LOG(LS_ERROR) << "addToken token:"<<token<< " stream:" << id;
+	tokenMap.insert(std::pair<std::string, std::string >(token, id));
+	assert(hasToken(token, id));
 	return success();
 }
 
@@ -895,17 +904,16 @@ const Json::Value PeerConnectionManager::listTokens()
 	{
 		Json::Value e;
 		e["token"] = token.first;
-		e["stream_name"] = token.second;
+		e["id"] = token.second;
 		value.append(e);
 	}
 	return value;
 }
 
+
 const Json::Value PeerConnectionManager::test()
 {
 	Json::Value value(Json::arrayValue);
-
-
 
 		for (auto it: peer_connectionobs_map_)
 		{
@@ -920,10 +928,7 @@ const Json::Value PeerConnectionManager::test()
 			for (unsigned int i = 0; i<localstreams->count(); i++)
 			{
 				localstreams->at(i)->label();
-
 			}
 		}
-
-
 	return value;
 }
