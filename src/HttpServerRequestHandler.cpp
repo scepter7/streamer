@@ -120,7 +120,7 @@ std::string  HttpServerRequestHandler::getParam(const struct mg_request_info *re
   }
 
   if (out.empty())
-    RTC_LOG(LS_ERROR) << "warning: getParam "<<param<<" not found";
+    RTC_LOG(LS_ERROR) << "warning: getParam "<<param<<" not found query_string="<<req_info->query_string;
   return out;
 }
 

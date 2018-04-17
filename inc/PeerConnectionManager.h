@@ -288,7 +288,10 @@ class PeerConnectionManager {
 	};
 
 	public:
-		PeerConnectionManager(const std::string & stunurl, const std::string & turnurl, const webrtc::AudioDeviceModule::AudioLayer audioLayer);
+		// PeerConnectionManager(const std::string & stunurl, const std::string & turnurl, const webrtc::AudioDeviceModule::AudioLayer audioLayer);
+
+		PeerConnectionManager(const Json::Value & config, const webrtc::AudioDeviceModule::AudioLayer audioLayer);
+
 		virtual ~PeerConnectionManager();
 
 		bool InitializePeerConnection();
@@ -307,6 +310,9 @@ class PeerConnectionManager {
 		void              setAnswer(const std::string &peerid, const Json::Value& jmessage);
 
 	protected:
+		const Json::Value & _config;
+
+
 		PeerConnectionObserver*                 CreatePeerConnection(const std::string& peerid);
 		// bool                                    AddStream(webrtc::PeerConnectionInterface* peer_connection, const std::string & streamID, const std::string & options);
 

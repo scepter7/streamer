@@ -35,14 +35,15 @@ const char kCandidateSdpName[] = "candidate";
 const char kSessionDescriptionTypeName[] = "type";
 const char kSessionDescriptionSdpName[] = "sdp";
 
-#undef RTC_LOG
-#define RTC_LOG(x) std::cout
+// #undef RTC_LOG
+// #define RTC_LOG(x) std::cout
 
 /* ---------------------------------------------------------------------------
 **  Constructor
 ** -------------------------------------------------------------------------*/
-PeerConnectionManager::PeerConnectionManager(const std::string & stunurl, const std::string & turnurl, const webrtc::AudioDeviceModule::AudioLayer audioLayer)
-	: audioDeviceModule_(webrtc::AudioDeviceModule::Create(0, audioLayer))
+PeerConnectionManager::PeerConnectionManager(const Json::Value & config, const webrtc::AudioDeviceModule::AudioLayer audioLayer)
+	: _config(config)
+	, audioDeviceModule_(webrtc::AudioDeviceModule::Create(0, audioLayer))
 	, audioDecoderfactory_(webrtc::CreateBuiltinAudioDecoderFactory())
 	, peer_connection_factory_(webrtc::CreatePeerConnectionFactory(NULL,
                                                                     rtc::Thread::Current(),
@@ -52,8 +53,8 @@ PeerConnectionManager::PeerConnectionManager(const std::string & stunurl, const 
                                                                     audioDecoderfactory_,
                                                                     NULL,
                                                                     NULL))
-	, stunurl_(stunurl)
-	, turnurl_(turnurl)
+	, stunurl_(config["stunurl"].asString())
+	, turnurl_(config["turnurl"].asString())
 {
 	if (turnurl_.length() > 0)
 	{
@@ -75,7 +76,45 @@ PeerConnectionManager::PeerConnectionManager(const std::string & stunurl, const 
 		}
 	}
 
+
+	// std::cout << "config: " << _config.toStyledString();
+	std::cout << "stun: " << stunurl_<< std::endl;;
+
+
+
+#if 1
+Json::Value sources = _config["sources"];
+std::cout << "sources size: " << sources.size() << std::endl;
+
+for (Json::Value::ArrayIndex i = 0; i != sources.size(); i++)
+{
+	Json::Value s = sources[i];
+	std::string id = s["id"].asString();
+	std::string url = s["url"].asString();
+	std::string transport = s["transport"].asString();
+	std::string timeout = s["transport"].asString();
+	rtc::scoped_refptr<RTSPSource> source = new rtc::RefCountedObject<RTSPSource>(id,url,transport);
+	if (!timeout.empty()) source->setTimeout(atoi(timeout.c_str()));
+	this->addSource(source);
+	std::cout << "addSource: " << source->toString()<< std::endl;;
 }
+
+
+Json::Value tokens = _config["tokens"];
+for (Json::Value::ArrayIndex i = 0; i != tokens.size(); i++)
+{
+	Json::Value tok = tokens[i];
+	std::string id = tok["id"].asString();
+	std::string token = tok["token"].asString();
+	this->addToken(token, id);		// id is source id
+}
+
+#endif
+
+
+}
+
+
 
 /* ---------------------------------------------------------------------------
 **  Destructor
@@ -869,12 +908,13 @@ bool PeerConnectionManager::hasToken(const std::string &token, const std::string
 
 const Json::Value PeerConnectionManager::addToken(const std::string &token, const std::string &id)
 {
+	RTC_LOG(LS_ERROR) << "addToken token:"<<token<< " stream:" << id;
+
 	if (token.empty()) return  error("addToken token empty");
 	if (id.empty()) return  error("addToken id empty");
 	if (!hasSource(id)) return error("addToken source not found");
 
 
-	RTC_LOG(LS_ERROR) << "addToken token:"<<token<< " stream:" << id;
 	tokenMap.insert(std::pair<std::string, std::string >(token, id));
 	assert(hasToken(token, id));
 	return success();

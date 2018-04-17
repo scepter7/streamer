@@ -8,13 +8,14 @@
 ** -------------------------------------------------------------------------*/
 
 #include <iostream>
-
+#include <fstream>
 #include "rtc_base/ssladapter.h"
 #include "rtc_base/thread.h"
 #include "p2p/base/stunserver.h"
 
 #include "PeerConnectionManager.h"
 #include "HttpServerRequestHandler.h"
+#include "RTSPSource.h"
 
 
 /* ---------------------------------------------------------------------------
@@ -23,7 +24,6 @@
 int main(int argc, char* argv[])
 {
 	const char* turnurl       = "";	//
-	// const char* defaultlocalstunurl  = "0.0.0.0:3478";
 	const char* localstunurl  = NULL;
 	const char* stunurl       = "stun.l.google.com:19302";
 	int logLevel              = rtc::LS_ERROR;	// rtc::LS_INFO (2), rtc::LS_ERROR (4), LS_VERBOSE;
@@ -33,11 +33,13 @@ int main(int argc, char* argv[])
 	webrtc::AudioDeviceModule::AudioLayer audioLayer = webrtc::AudioDeviceModule::kDummyAudio;
 	std::cout << "info:"<<rtc::LS_INFO<< " err:"<< rtc::LS_ERROR<<" verbose:"<<  rtc::LS_VERBOSE;
 
+	std::string configFile = "config.json";
+
 
 	std::string httpAddress("0.0.0.0:");
 	std::string httpPort = "8000";
 	std::string authKey = "";
-	bool test=false;
+
 
 	const char * port = getenv("PORT");
 	if (port)
@@ -56,10 +58,11 @@ int main(int argc, char* argv[])
 					authKey = optarg;
 				}
 				break;
-			case 't':
-					test = true;
+			case 'f':
+					if (optarg) {	//
+						configFile = optarg;
+					}
 					break;
-
 			case 'v':
 				logLevel--;
 				if (optarg) {	//
@@ -84,17 +87,66 @@ int main(int argc, char* argv[])
 	rtc::Thread* thread = rtc::Thread::Current();
 	rtc::InitializeSSL();
 
+	std::cout << "loading config "<< std::endl;
+	std::ifstream file(configFile);
+	Json::Value config;
+
+	if (file.good())
+	{
+		file >> config;
+		std::cout << "config="<<config.toStyledString()<< std::endl;
+
+	} else {
+		std::cout << "No config... using defaults"<< std::endl;
+
+		config["turnurl"] = turnurl;
+		config["stunurl"] = stunurl;
+	}
+
 
 	// webrtc server
-	PeerConnectionManager webRtcServer(stunurl, turnurl, audioLayer);
+	PeerConnectionManager webRtcServer(config, audioLayer);
 	if (!webRtcServer.InitializePeerConnection())
 	{
 		std::cout << "Cannot Initialize WebRTC server" << std::endl;
 	}
 	else
 	{
+
 		// http server
+
 		std::vector<std::string> options;
+		Json::Value httpOptions = config["httpOptions"];
+		std::cout << "httpOptions="<<httpOptions.toStyledString()<< std::endl;
+
+		// Json::ValueIterator
+		for( Json::ValueIterator itr = httpOptions.begin() ; itr != httpOptions.end() ; itr++ )
+		{
+			Json::Value key = itr.key();
+			Json::Value value = (*itr);
+			// std::cout << "kv:" << key.asString() << "=" <<value.asString() <<std::endl;
+			if (!key.asString().empty() && !value.asString().empty())
+			{
+				options.push_back(key.asString());
+				options.push_back(value.asString());
+			} else
+			{
+				std::cout << "skip httpOptions:" << key.asString() << "=" <<value.asString() <<std::endl;
+			}
+		}
+		
+#if 0
+		if (config["document_root"])
+		{
+			options.push_back("document_root");
+			options.push_back(config["document_root"].asString());
+		}
+		if (config["ssl_certificate"])
+		{
+			options.push_back("ssl_certificate");
+			options.push_back(config["ssl_certificate"].asString());
+		}
+
 		options.push_back("listening_ports");
 		options.push_back(httpAddress);
 
@@ -111,6 +163,7 @@ int main(int argc, char* argv[])
 			std::cout << "Starting in test mode.. adding test stream and using .html";
 		}
 
+#endif
 
 		try {
 			std::cout << "HTTP Listen at " << httpAddress << std::endl;
@@ -129,6 +182,11 @@ int main(int argc, char* argv[])
 					std::cout << "STUN Listening at " << server_addr.ToString() << std::endl;
 				}
 			}
+
+
+
+
+
 
 			// mainloop
 			thread->Run();
