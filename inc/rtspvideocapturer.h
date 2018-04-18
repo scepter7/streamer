@@ -12,6 +12,11 @@
 
 #include <string.h>
 #include <vector>
+#include <queue>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <iostream>
 
 #include "environment.h"
 #include "rtspconnectionclient.h"
@@ -24,12 +29,21 @@
 
 #include "pc/localaudiosource.h"
 #include "api/audio_codecs/builtin_audio_decoder_factory.h"
-#include <iostream>
+
 
 #include "RTSPSource.h"
 
 #include "h264_stream.h"
 
+class Frame
+{
+	public:
+		Frame(): m_timestamp_ms(0) {}
+		Frame(std::vector<uint8_t> && content, uint64_t timestamp_ms) : m_content(content), m_timestamp_ms(timestamp_ms) {}
+	
+		std::vector<uint8_t> m_content;
+		uint64_t m_timestamp_ms;
+};
 class RTSPVideoCapturer : public cricket::VideoCapturer, public RTSPConnection::Callback, public rtc::Thread, public webrtc::DecodedImageCallback
 {
 	public:
@@ -82,6 +96,11 @@ class RTSPVideoCapturer : public cricket::VideoCapturer, public RTSPConnection::
 		std::vector<uint8_t>                  m_cfg;
 		std::string                           m_codec;
     h264_stream_t*                        m_h264;
+		std::queue<Frame>                     m_queue;
+		std::mutex                            m_queuemutex;
+		std::condition_variable               m_queuecond;
+		std::thread                           m_decoderthread;
+
 		unsigned long bytesReceived;
 		unsigned long goodPackets, badPackets, decodedFrames;
 		int m_prevType;
