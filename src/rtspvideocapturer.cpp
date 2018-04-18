@@ -52,7 +52,7 @@ RTSPVideoCapturer::RTSPVideoCapturer(rtc::scoped_refptr<RTSPSource> source)
 
 	// this->json["url"] = uri;
 	// json["transport"] = rtptransport;
-  decodedFrames=0;
+    decodedFrames=0;
 	bytesReceived=0;
 	goodPackets=0;
 	badPackets=0;
@@ -163,7 +163,7 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 		switch(m_h264->nal->nal_unit_type)
 		{
 			case NAL_UNIT_TYPE_SPS:
-			{
+			
 				// RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData SPS";
 				m_cfg.clear();
 				m_cfg.insert(m_cfg.end(), buffer, buffer+size);
@@ -191,77 +191,36 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 					m_decoder->InitDecode(&codec_settings,2);
 					m_decoder->RegisterDecodeCompleteCallback(this);
 				}
-			}
+			
 				break;
 			case NAL_UNIT_TYPE_PPS:
 				// RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData PPS";
 				m_cfg.insert(m_cfg.end(), buffer, buffer+size);
 				break;
-
-
-
-			case NAL_UNIT_TYPE_CODED_SLICE_IDR:
-				if (m_decoder.get()) {
-					uint8_t buf[m_cfg.size() + size];
-					memcpy(buf, m_cfg.data(), m_cfg.size());
-					memcpy(buf+m_cfg.size(), buffer, size);
-					webrtc::EncodedImage input_image(buf, sizeof(buf), sizeof(buf) + webrtc::EncodedImage::GetBufferPaddingBytes(webrtc::VideoCodecType::kVideoCodecH264));
-					input_image._timeStamp = ts*1000;
-					//RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData IDR ts="<<(ts*1000);
-					res = m_decoder->Decode(input_image, false, NULL);
-					if (res!=0)
-					{
-						RTC_LOG(INFO) << "RTSPVideoCapturer:onData decode failed NAL_UNIT_TYPE_CODED_SLICE_IDR :" << m_h264->nal->nal_unit_type;
-
-					}
-
-				} else 	{
-					//RTC_LOG(LS_ERROR) << "RTSPVideoCapturer:onData no decoder";
-					res = -1;
-				}
-				break;
-
-			case NAL_UNIT_TYPE_AUD:
-			case NAL_UNIT_TYPE_SEI:
-				// these two nal units were causing warnings downstream in the webrtc Decoder code. Safe to ignore?
-				// fallthrough.
-
+	
+		
 			default:
 				if (m_decoder.get()) {
-					webrtc::EncodedImage input_image(buffer, size, size + webrtc::EncodedImage::GetBufferPaddingBytes(webrtc::VideoCodecType::kVideoCodecH264));
-					input_image._timeStamp = ts*1000;
-					//RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData SLICE NALU:" << m_h264->nal->nal_unit_type << " ts=" << input_image._timeStamp;
-					res = m_decoder->Decode(input_image, false, NULL);
-					#if 1
-					if (res!=0)
-					{
-
-						RTC_LOG(INFO) << "RTSPVideoCapturer:onData default failed nal=" << m_h264->nal->nal_unit_type << " m_prevType=" << m_prevType<<" size="<<size;
-
-
-						//std::raise(SIGINT);
-						#if 0
-						breaknow();
-						int retry = m_decoder->Decode(input_image, false, NULL);
-						RTC_LOG(INFO) << "RTSPVideoCapturer:onData decode failed NALU:" << m_h264->nal->nal_unit_type << " res="<<res<<" m_prevType=" << m_prevType << " retry ="<<retry;
-						breaknow();
-						#endif
-
+					std::vector<uint8_t> content;
+					if (m_h264->nal->nal_unit_type == NAL_UNIT_TYPE_CODED_SLICE_IDR) {
+						RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData IDR";				
+						content.insert(content.end(), m_cfg.begin(), m_cfg.end());
 					}
-					else
-					{
-							if (badPackets<50)
-								RTC_LOG(INFO) << "RTSPVideoCapturer:onData default successNALU:" << m_h264->nal->nal_unit_type << " m_prevType=" << m_prevType;
-
-
+					else {
+						RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData SLICE NALU:" << m_h264->nal->nal_unit_type;
 					}
-					#endif
-
-				}else 	{
+					content.insert(content.end(), buffer, buffer+size);
+					Frame frame(std::move(content), ts);			
+					{
+						std::unique_lock<std::mutex> lock(m_queuemutex);
+						m_queue.push(frame);
+					}
+					m_queuecond.notify_all();
+				} else {
 					RTC_LOG(LS_ERROR) << "RTSPVideoCapturer:onData no decoder";
 					res = -1;
-				}
-
+				}				
+				break;
 		}
 
 	} else if (m_codec == "JPEG") {
@@ -294,16 +253,6 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 		}
 
 	}
-	if (res==0)
-	{
-		goodPackets++;
-	}
-	else
-	{
-		badPackets++;
-		if (badPackets <100 && (badPackets % 100==0) )
-		RTC_LOG(INFO) << "onData BHL bytesReceived=" << bytesReceived<<" goodPackets="<<goodPackets<<" badPackets="<<badPackets;
-	}
 
 
 
@@ -334,6 +283,9 @@ void RTSPVideoCapturer::DecoderThread()
 			webrtc::EncodedImage input_image(buf, size, allocsize);		
 			input_image._timeStamp = frame.m_timestamp_ms; // store time in ms that overflow the 32bits
 			int res = m_decoder->Decode(input_image, false, NULL);
+			
+			decodedFrames++;
+			
 			if (res==0)
 			{
 				goodPackets++;
@@ -344,6 +296,9 @@ void RTSPVideoCapturer::DecoderThread()
 				if (badPackets <100 && (badPackets % 100==0) )
 				RTC_LOG(INFO) << "DecoderThread=" << bytesReceived<<" goodPackets="<<goodPackets<<" badPackets="<<badPackets;
 			}
+			
+			
+			
 		}
 	}
 }
