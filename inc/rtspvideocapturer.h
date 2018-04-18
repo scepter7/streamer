@@ -77,7 +77,7 @@ class RTSPVideoCapturer : public cricket::VideoCapturer, public RTSPConnection::
 		virtual bool IsScreencast() const { return false; };
 		virtual bool IsRunning() { return this->capture_state() == cricket::CS_RUNNING; }
 
-
+		void DecoderThread();
 
 		const Json::Value getJSON();
 		unsigned int fps=25;
