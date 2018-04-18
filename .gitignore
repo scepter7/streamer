@@ -15,4 +15,5 @@ libWebRTC__*
 out
 cscope.out
 live555
+*.gch
 
