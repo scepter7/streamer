@@ -318,7 +318,7 @@ class PeerConnectionManager {
 
 
 		bool attachStream(webrtc::PeerConnectionInterface* peer_connection, const std::string & streamID);
-		const Json::Value toJSON(rtc::scoped_refptr<RTSPSource> source);
+		const Json::Value toJSON(rtc::scoped_refptr<RTSPSource> source, bool admin);
 		const Json::Value toJSON(rtc::scoped_refptr<RTSPStream> stream);
 
 
@@ -368,7 +368,7 @@ class PeerConnectionManager {
 
 		virtual bool hasSource(const std::string &id);
 		virtual const Json::Value listStreams();
-		virtual const Json::Value listSources();
+		virtual const Json::Value listSources(bool admin);
 
 		virtual const Json::Value addSource(rtc::scoped_refptr<RTSPSource> source);
 		virtual const Json::Value removeSource(const std::string &id);

@@ -15,7 +15,6 @@
 
 #include "PeerConnectionManager.h"
 #include "HttpServerRequestHandler.h"
-#include "RTSPSource.h"
 
 
 /* ---------------------------------------------------------------------------
@@ -134,7 +133,7 @@ int main(int argc, char* argv[])
 				std::cout << "skip httpOptions:" << key.asString() << "=" <<value.asString() <<std::endl;
 			}
 		}
-		
+
 #if 0
 		if (config["document_root"])
 		{

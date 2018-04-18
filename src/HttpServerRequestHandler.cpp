@@ -179,18 +179,24 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 
 	m_func["/call"]                  = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
 		std::string peerid;
-		std::string streamID;
+		std::string id;
 		// std::string audiourl;
 		std::string options;
-    if (!hasToken(req_info, in)) return unauthorized();
+    if (!hasToken(req_info, in))
+      return unauthorized();
 
 		if (req_info->query_string) {
           CivetServer::getParam(req_info->query_string, "peerid", peerid);
-          CivetServer::getParam(req_info->query_string, "url", streamID);    // streamID
-          // CivetServer::getParam(req_info->query_string, "audiourl", audiourl);
+          CivetServer::getParam(req_info->query_string, "id", id);    // streamID
           CivetServer::getParam(req_info->query_string, "options", options);
         }
-		return m_webRtcServer->call(peerid, streamID, options, in);
+
+    if (id.empty())
+      return m_webRtcServer->error("id required");
+    if (peerid.empty())
+        return m_webRtcServer->error("peerid required");
+
+		return m_webRtcServer->call(peerid, id, options, in);
 	};
 
 	m_func["/hangup"]                = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
@@ -239,14 +245,15 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 	  return m_webRtcServer->getPeerConnectionList();
 	};
 
+  // admin: active streams
 	m_func["/getStreams"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
     if (!isAdmin(req_info, in)) return unauthorized();
 		return m_webRtcServer->listStreams();
 	};
 
+  // admin: all sources
   m_func["/getSources"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
-    if (!isAdmin(req_info, in)) return unauthorized();
-    return m_webRtcServer->listSources();
+    return m_webRtcServer->listSources(isAdmin(req_info, in));
   };
 
   m_func["/addSource"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
@@ -254,15 +261,23 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
     std::string id = getParam(req_info, in, "id");
     std::string url = getParam(req_info, in, "url");
     std::string transport = getParam(req_info, in, "transport");
-    rtc::scoped_refptr<RTSPSource> source = new rtc::RefCountedObject<RTSPSource>(id,url,transport);\
-    std::string timeout = getParam(req_info, in, "timeout");
-    if (!timeout.empty()) source->setTimeout(atoi(timeout.c_str()));
-
+    std::string name = getParam(req_info, in, "name");
 
     if (id.empty())
       return m_webRtcServer->error("id required");
     if (url.empty())
       return m_webRtcServer->error("url required");
+
+    if (name.empty()) name = id;
+    rtc::scoped_refptr<RTSPSource> source = new rtc::RefCountedObject<RTSPSource>(id, url, transport, name);
+    std::string timeout = getParam(req_info, in, "timeout");
+    if (!timeout.empty())
+    {
+      int t = atoi(timeout.c_str());
+      if (t<1)
+        return m_webRtcServer->error("bad timeout");
+      source->setTimeout(t);
+    }
 
     return m_webRtcServer->addSource(source); // req_info->query_string); // getParam(req_info, in, "id"), getParam(req_info, in, "url"), getParam(req_info, in, "rtp_transport"));
   };

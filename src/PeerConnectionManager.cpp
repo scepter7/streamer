@@ -92,9 +92,19 @@ for (Json::Value::ArrayIndex i = 0; i != sources.size(); i++)
 	std::string id = s["id"].asString();
 	std::string url = s["url"].asString();
 	std::string transport = s["transport"].asString();
-	std::string timeout = s["transport"].asString();
-	rtc::scoped_refptr<RTSPSource> source = new rtc::RefCountedObject<RTSPSource>(id,url,transport);
-	if (!timeout.empty()) source->setTimeout(atoi(timeout.c_str()));
+	std::string name = s["name"].asString();
+	if (name.empty())
+		name = id;
+	std::string timeout = s["timeout"].asString();
+	rtc::scoped_refptr<RTSPSource> source = new rtc::RefCountedObject<RTSPSource>(id, url, transport, name);
+
+	if (!timeout.empty())
+	{
+		int t = atoi(timeout.c_str());
+		if (t>1)
+			source->setTimeout(t);
+	}
+
 	this->addSource(source);
 	std::cout << "addSource: " << source->toString()<< std::endl;;
 }
@@ -335,6 +345,7 @@ const Json::Value PeerConnectionManager::call(const std::string & peerid, const 
 
 			if (!rtsp_stream.get())
 			{
+                                RTC_LOG(LS_ERROR) << "no stream found:" << streamID;
 				return this->error("Can't add rtsp_stream ");
 			}
 
@@ -398,7 +409,7 @@ bool PeerConnectionManager::streamStillUsed(const std::string & id)
 		rtc::scoped_refptr<webrtc::StreamCollectionInterface> localstreams (peerConnection->local_streams());
 		for (unsigned int i = 0; i<localstreams->count(); i++)
 		{
-			if (localstreams->at(i)->label() == id)
+			if (localstreams->at(i)->id() == id)
 			{
 				stillUsed = true;
 				break;
@@ -411,6 +422,9 @@ bool PeerConnectionManager::streamStillUsed(const std::string & id)
 
 void PeerConnectionManager::closeStream(rtc::scoped_refptr<PeerConnectionManager::RTSPStream> stream)
 {
+
+	std::cout << "closeStream " << stream->getID() << std::endl;
+
 	rtc::scoped_refptr<webrtc::MediaStreamInterface> media = stream->stream;
 	// remove video tracks
 	while (media->GetVideoTracks().size() > 0)
@@ -435,7 +449,7 @@ void PeerConnectionManager::closeStream(rtc::scoped_refptr<PeerConnectionManager
 const Json::Value PeerConnectionManager::hangUp(const std::string &peerid)
 {
 	bool result = false;
-	RTC_LOG(INFO) << __FUNCTION__ << " " << peerid;
+	std::cout << "hangUp " << peerid << std::endl;
 
 	std::map<std::string, PeerConnectionObserver* >::iterator  it = peer_connectionobs_map_.find(peerid);
 	if (it != peer_connectionobs_map_.end())
@@ -449,7 +463,7 @@ const Json::Value PeerConnectionManager::hangUp(const std::string &peerid)
 		Json::Value streams;
 		for (unsigned int i = 0; i<localstreams->count(); i++)
 		{
-			std::string id = localstreams->at(i)->label();
+			std::string id = localstreams->at(i)->id();
 
 			bool stillUsed = this->streamStillUsed(id);
 			if (!stillUsed)
@@ -556,7 +570,7 @@ const Json::Value PeerConnectionManager::getPeerConnectionList()
 						}
 
 						Json::Value stream;
-						stream[localstreams->at(i)->label()] = tracks;
+						stream[localstreams->at(i)->id()] = tracks;
 
 						streams.append(stream);
 					}
@@ -751,7 +765,7 @@ rtc::scoped_refptr<PeerConnectionManager::RTSPStream> PeerConnectionManager::get
 		std::map<std::string, rtc::scoped_refptr<RTSPSource> >::iterator  sourceit = sourceMap_.find(id);
 
 		if (sourceit == sourceMap_.end()) {
-			RTC_LOG(LS_ERROR) << "bhl PeerConnectionManager::getRTSPStream failed for "<<id << " list="<< listSources();
+			RTC_LOG(LS_ERROR) << "bhl PeerConnectionManager::getRTSPStream failed for "<<id << " list=" << this->listSources(false);
 			return ret;
 		}
 
@@ -760,7 +774,7 @@ rtc::scoped_refptr<PeerConnectionManager::RTSPStream> PeerConnectionManager::get
 
 		if (source->getURL().empty())
 		{
-			RTC_LOG(LS_ERROR) << "bhl PeerConnectionManager::getRTSPStream failed for "<<id << " list="<< listSources();
+			RTC_LOG(LS_ERROR) << "bhl PeerConnectionManager::getRTSPStream failed for "<<id << " list="<< this->listSources(false);
 			return ret;
 		}
 
@@ -833,30 +847,34 @@ const Json::Value PeerConnectionManager::toJSON(rtc::scoped_refptr<RTSPStream> s
 }
 
 
-const Json::Value PeerConnectionManager::toJSON(rtc::scoped_refptr<RTSPSource> source)
+const Json::Value PeerConnectionManager::toJSON(rtc::scoped_refptr<RTSPSource> source, bool admin)
 {
 	Json::Value entry;
 	entry["id"] = source->getID();
-	entry["url"] = source->getURL();
-	entry["transport"] = source->getTransport();
-	entry["timeout"] = source->getTimeout();
-	rtc::scoped_refptr<PeerConnectionManager::RTSPStream> stream = getStream(source->getID());
-	if (stream!=NULL)
+	entry["name"] = source->getName();
+	if (admin)
 	{
-		entry["stream"] = this->toJSON(stream);
+		entry["url"] = source->getURL();
+		entry["transport"] = source->getTransport();
+		entry["timeout"] = source->getTimeout();
+		rtc::scoped_refptr<PeerConnectionManager::RTSPStream> stream = getStream(source->getID());
+		if (stream!=NULL)
+		{
+			entry["stream"] = this->toJSON(stream);
+		}
 	}
-
 
 	return entry;
 
 }
-const Json::Value PeerConnectionManager::listSources()
+
+const Json::Value PeerConnectionManager::listSources(bool admin)
 {
 	Json::Value value(Json::arrayValue);
 	for (auto url : sourceMap_)
 	{
 		rtc::scoped_refptr<RTSPSource> source = url.second;
-		value.append(toJSON(source));
+		value.append(toJSON(source, admin));
 	}
 	return value;
 }
@@ -868,11 +886,13 @@ const Json::Value PeerConnectionManager::addSource(rtc::scoped_refptr<RTSPSource
 			return error("stream already defined");
 	if (source->getID().empty())
  		return error("id required");
-	if (source->getURL().empty())
- 		return error("url required");
+		if (source->getURL().empty())
+	 		return error("url required");
+	if (source->getName().empty())
+		 	return error("name required");
 
 	sourceMap_[source->getID()]=source;
-	Json::Value reply = toJSON(source);
+	Json::Value reply = toJSON(source, true);
 	reply["success"] = true;
 	return reply;
 }
@@ -880,6 +900,8 @@ const Json::Value PeerConnectionManager::addSource(rtc::scoped_refptr<RTSPSource
 
 const Json::Value PeerConnectionManager::removeSource(const std::string &id)
 {
+	std::cout << "removeSource: "<<id<<std::endl;
+
 	// TODO: Stop and remove the stream if it is "streaming".
 	std::map<std::string, rtc::scoped_refptr<RTSPSource> >::iterator  it = sourceMap_.find(id);
 	if (it != sourceMap_.end())
@@ -887,7 +909,7 @@ const Json::Value PeerConnectionManager::removeSource(const std::string &id)
 		sourceMap_.erase(it);
 		return success();
   }
-	return error("removeStream: id not found");
+	return error("removeSource: id not found");
 }
 
 
@@ -967,7 +989,7 @@ const Json::Value PeerConnectionManager::test()
 
 			for (unsigned int i = 0; i<localstreams->count(); i++)
 			{
-				localstreams->at(i)->label();
+				localstreams->at(i)->id();
 			}
 		}
 	return value;
