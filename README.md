@@ -3,11 +3,20 @@ streamer
 H.264 RTSP to WebRTC server based on a fork of [WebRTC-streamer](https://github.com/mpromonet/webrtc-streamer) with goal of RTSP H.264 from IP camera to webrtc.
 
 This fork attempts to remove hardware video capture. It is only for RTSP/IP camera video.
-The HTML samples are not current-- the 
+The HTML samples use a list of rtsp sources from the config.json file. Many rtsp feeds are offline.
+
+This version is designed to allow a server to add or remove rtsp feeds to stream.
+Each stream has an ID so the rtsp URL isn't exposed to the web client.
+A token system can be used to allow access to particular streams.
+A set of API endpoints have been added for admin
+Other Api endpoints are for viewers, with access checked by (optional) token.
+
+The html examples need to be served via https. I use a reverse proxy and letsencrypt. 
 
 TODO: If flagged, send h.264 direct to client browser if flag is set. Otherwise do default method of decode/encode.
 
-In progress!
+Looking for assistance for this task.. !
+
 
 Added API calls to:
   Manage tokens for security access to streams
