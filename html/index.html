@@ -2,12 +2,39 @@
 <head>
 <title>WebRTC Streamer</title>
 <style media="screen" type="text/css">
-
+nav {
+    background-color: #333;
+    overflow: hidden;
+}
+nav a {
+    float: left;
+    display: block;
+    color: #f2f2f2;
+    text-align: center;
+    padding: 10px 10px;
+}
+nav a:hover {
+    background-color: #ddd;
+    color: black;
+}
+nav a.active {
+    background-color: #4CAF50;
+    color: white;
+}
+nav a.active:hover {
+    background-color: #4CAF50;
+    color: black;
+}
 video {
     display: block;
     margin: 0 auto;
 }
-
+h2 {
+    text-align: center;
+}
+footer {
+    text-align: center;
+}
 </style>
 <script src="ajax.js" ></script>
 <script src="streamer.js" ></script>
@@ -15,8 +42,91 @@ video {
 	// ------------------------------------------
 	// WebRTC connections
 	// ------------------------------------------
-	var streamer = null;
+	var webRtcServerList = {};
   var serverPrefix = "/webrtc-api";
+  var sourceLists = [];
+  var sourceMap = [];
+
+	// ------------------------------------------
+	// init source list
+	// ------------------------------------------
+  function onGetSources(sources) {
+    sourceList = sources;
+
+		// create navigation menu
+		var urllist = document.getElementById("menu");
+    for (var i = 0; i < sources.length; i++) {
+      var source = sources[i];
+      var id = source['id'];
+      var name = source['name'];
+      sourceMap[id] = source;
+
+      var option = document.createElement("a");
+      option._id = id;
+			option.text = name;
+			option.id   = "nav_" + id;
+			option.onclick = function () {
+        try {
+          var source = sourceMap[this._id];
+          var id = source['id'];
+
+
+          console.log("onClick:"+source+" id="+id );
+
+        if (this.className === "active") {
+					del(id);
+				} else {
+					add(source);
+				}
+      } catch(e) {
+        console.log(e);
+        alert(e);
+      }
+      }
+			urllist.appendChild(option);
+		}
+
+    // start first in list.
+		if (sources.length > 0) {
+			add(sourceList[0]);
+		}
+	}
+
+	// ------------------------------------------
+	// Fill version
+	// ------------------------------------------
+	function onVersion(version) {
+		document.getElementById("footer").innerHTML = "<!-- "+version+" -->";
+	}
+
+	// ------------------------------------------
+	// add a webrtc client connection
+	// ------------------------------------------
+	function del(id) {
+		var videoTag = "video_" + id;
+		var divElt = 	document.getElementById ("div_" + videoTag);
+    if (divElt)
+    {
+    		// disconnect webrtc connection
+    		var webrtcServer = webRtcServerList[id];
+    		if (webrtcServer) {
+    			webrtcServer.disconnect();
+    			webRtcServerList[id] = undefined;
+    		} else {
+          console.log("streamer not found:"+id);
+        }
+
+    		document.getElementById("content").removeChild(divElt);
+
+    		// unhighlight the navigation
+    		var navElt = 	document.getElementById ("nav_" + id);
+    		navElt.className = "";
+      } else {
+        console.log("del div not found:"+id);
+
+      }
+
+	}
 
   var callback = {
       error : function(msg, exception)
@@ -34,27 +144,122 @@ video {
   };
 
 
+/*
+[
+ {
+    "error" : "",
+    "id" : "stream1",
+    "rtsp_stream" : {
+       "badPackets" : 53319,
+       "bytesReceived" : 223619451,
+       "decodedFrames" : 52328,
+       "goodPackets" : 54080
+    }
+ }
+]
+*/
+
+  function onDisplayStats(streams)
+  {
+    for (var i = 0; i < streams.length; i++) {
+      var html = "";
+
+      var stream = streams[i];
+      var id = stream['id'];
+      var error = stream['error'];
+      var rtsp_stream = stream['rtsp_stream'];
+      var statsElem = 	document.getElementById ("stats_"+id);
+      html = "id="+id;
+      if (error) html +="<strong>"+error+"</strong>\n";
+      if (rtsp_stream)
+      {
+        html += " goodPackets:"+rtsp_stream['goodPackets'];
+        html += " badPackets:"+rtsp_stream['badPackets'];
+        html += " bytesReceived:"+rtsp_stream['bytesReceived'];
+        html += " decodedFrames:"+rtsp_stream['decodedFrames'];
+      }
+
+      if (statsElem)
+      {
+        statsElem.innerHTML = html;
+      }
+    }
+
+      setTimeout(displayStats, 3000);
+
+    // send(serverPrefix+"/getStreams", null, null, onDisplayStats);
+
+  }
+  function displayStats()
+  {
+    send(serverPrefix+"/getStreams", null, null, onDisplayStats);
+  }
+
+	// ------------------------------------------
+	// add a webrtc client connection
+	// ------------------------------------------
+	function add(source) {
+    var id = source.id;
+    var name = source.name;
+
+		var videoTag = "video_" + id;
+
+		// add a video element to display webrtc stream
+		if (document.getElementById (videoTag) === null) {
+			var divelt = document.createElement("div");
+			divelt.id = "div_" + videoTag
+
+			var nameelt = document.createElement("h2");
+
+			nameelt.innerHTML = name;
+			divelt.appendChild(nameelt);
+			var videoelt = document.createElement("video");
+			videoelt.id = videoTag;
+
+			divelt.appendChild(videoelt);
+
+      var stats = document.createElement("div");
+      stats.id = "stats_"+id;
+      stats.class = "video_stats";
+      divelt.appendChild(stats);
+
+			document.getElementById("content").appendChild(divelt);
+		}
+
+		var videoelt = 	document.getElementById (videoTag);
+    var token = ""; // if using tokens to control access, insert here.
+
+		// connect video element to webrtc stream
+		var webRtcServer = new WebRtcStreamer(videoTag, serverPrefix, token, callback);
+		webRtcServer.connect(source.id);
+		var navElt = 	document.getElementById ("nav_" + id);
+		navElt.className = "active";
+
+		// register webrtc streamer connection
+		webRtcServerList[id] = webRtcServer;
+	}
+
 	// ------------------------------------------
 	// load/unload callbacks
 	// ------------------------------------------
-	window.onload         = function()
-  {
-	streamer = new WebRtcStreamer("video", serverPrefix, null, callback);
-	streamer.connect("stream1");
-	};
-
+	window.onload         = function() {
+		send(serverPrefix+"/getSources", null, null, onGetSources);
+		send(serverPrefix+"/version", null, null, onVersion);
+    displayStats();
+	}
 	window.onbeforeunload = function() {
-		if (streamer)
-			streamer.disconnect()
-
+		for (var url in webRtcServerList) {
+			webRtcServerList[url].disconnect()
+		}
 	};
 </script>
 </head>
 <body>
+	<nav id="menu"></nav>
+	<div id="content"></div>
+  <div id="debug"></div>
+  <a href="help.html">help</a>
 
-	<div id="content">
-    <video id="video"></video>
-  </div>
-  <a href="/help.html">help</a>
+	<footer id="footer"></footer>
 </body>
 </html>

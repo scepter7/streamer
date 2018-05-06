@@ -709,7 +709,8 @@ rtc::scoped_refptr<PeerConnectionManager::RTSPStream> PeerConnectionManager::Cre
 
 // create audio track
 
-
+	std::cout << "terminate: "<<audioDeviceModule_<< std::endl;
+	
 	audioDeviceModule_->Terminate();
 	rtc::scoped_refptr<RTSPAudioSource> audioSource = RTSPAudioSource::Create(audioDecoderfactory_, source->getURL());
 	stream->audio_track = peer_connection_factory_->CreateAudioTrack(kAudioLabel, audioSource);
@@ -892,9 +893,7 @@ const Json::Value PeerConnectionManager::addSource(rtc::scoped_refptr<RTSPSource
 		 	return error("name required");
 
 	sourceMap_[source->getID()]=source;
-	Json::Value reply = toJSON(source, true);
-	reply["success"] = true;
-	return reply;
+	return success();
 }
 
 

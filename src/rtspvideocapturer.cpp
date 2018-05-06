@@ -163,7 +163,7 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 		switch(m_h264->nal->nal_unit_type)
 		{
 			case NAL_UNIT_TYPE_SPS:
-			
+			{	
 				// RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData SPS";
 				m_cfg.clear();
 				m_cfg.insert(m_cfg.end(), buffer, buffer+size);
@@ -191,8 +191,9 @@ bool RTSPVideoCapturer::onData(const char* id, unsigned char* buffer, ssize_t si
 					m_decoder->InitDecode(&codec_settings,2);
 					m_decoder->RegisterDecodeCompleteCallback(this);
 				}
-			
-				break;
+			}
+			break;
+
 			case NAL_UNIT_TYPE_PPS:
 				// RTC_LOG(LS_VERBOSE) << "RTSPVideoCapturer:onData PPS";
 				m_cfg.insert(m_cfg.end(), buffer, buffer+size);

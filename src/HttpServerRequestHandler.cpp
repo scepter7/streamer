@@ -187,7 +187,7 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
 
 		if (req_info->query_string) {
           CivetServer::getParam(req_info->query_string, "peerid", peerid);
-          CivetServer::getParam(req_info->query_string, "id", id);    // streamID
+          CivetServer::getParam(req_info->query_string, "id", id);
           CivetServer::getParam(req_info->query_string, "options", options);
         }
 
@@ -259,7 +259,7 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
   m_func["/addSource"] = [this](const struct mg_request_info *req_info, const Json::Value & in) -> Json::Value {
     if (!isAdmin(req_info, in)) return unauthorized();
     std::string id = getParam(req_info, in, "id");
-    std::string url = getParam(req_info, in, "url");
+    std::string url = getParam(req_info, in, "url");  // rtsp://
     std::string transport = getParam(req_info, in, "transport");
     std::string name = getParam(req_info, in, "name");
 
@@ -278,6 +278,18 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
         return m_webRtcServer->error("bad timeout");
       source->setTimeout(t);
     }
+
+    std::string fps = getParam(req_info, in, "fps");
+    if (!fps.empty())
+    {
+      int t = atoi(fps.c_str());
+      if (t<=0 && t>60)
+        return m_webRtcServer->error("bad fps");
+      source->setFPS(t);
+    } else {
+      source->setFPS(m_webRtcServer->getFPS());
+    }
+
 
     return m_webRtcServer->addSource(source); // req_info->query_string); // getParam(req_info, in, "id"), getParam(req_info, in, "url"), getParam(req_info, in, "rtp_transport"));
   };
@@ -313,7 +325,7 @@ HttpServerRequestHandler::HttpServerRequestHandler(PeerConnectionManager* webRtc
     if (!isAdmin(req_info, in)) return unauthorized();
 		Json::Value answer;
 		for (auto it : m_func) {
-			answer.append(it.first);
+      answer.append(prefix+it.first);
 		}
 		return answer;
 	};

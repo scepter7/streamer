@@ -1,0 +1,60 @@
+<html>
+<head>
+<title>WebRTC Streamer</title>
+<style media="screen" type="text/css">
+
+video {
+    display: block;
+    margin: 0 auto;
+}
+
+</style>
+<script src="ajax.js" ></script>
+<script src="streamer.js" ></script>
+<script>
+	// ------------------------------------------
+	// WebRTC connections
+	// ------------------------------------------
+	var streamer = null;
+  var serverPrefix = "/webrtc-api";
+
+  var callback = {
+      error : function(msg, exception)
+      {
+          console.log("webrtc error:"+msg);
+      },
+      connected : function()
+      {
+          console.log("webrtc connected");
+      },
+      message : function(msg)
+      {
+          console.log("webrtc message:"+msg);
+      }
+  };
+
+
+	// ------------------------------------------
+	// load/unload callbacks
+	// ------------------------------------------
+	window.onload         = function()
+  {
+	streamer = new WebRtcStreamer("video", serverPrefix, null, callback);
+	streamer.connect("stream1");
+	};
+
+	window.onbeforeunload = function() {
+		if (streamer)
+			streamer.disconnect()
+
+	};
+</script>
+</head>
+<body>
+
+	<div id="content">
+    <video id="video"></video>
+  </div>
+  <a href="help.html">help</a>
+</body>
+</html>

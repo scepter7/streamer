@@ -34,21 +34,19 @@ int main(int argc, char* argv[])
 
 	std::string configFile = "config.json";
 
+	int defaultPort = 8000;
 
-	std::string httpAddress("0.0.0.0:");
-	std::string httpPort = "8000";
 	std::string authKey = "";
 
-
-	const char * port = getenv("PORT");
-	if (port)
-	{
-		httpPort = port;
-	}
-	httpAddress.append(httpPort);
+	// const char * port = getenv("PORT");
+	// if (port)
+	// {
+	// 	httpPort = port;
+	// }
+	// httpAddress.append(httpPort);
 
 	int c = 0;
-	while ((c = getopt (argc, argv, "thVv:k:" "c:H:w:" "t:S::s::" "a::n:u:")) != -1)
+	while ((c = getopt (argc, argv, "kfVv:k:" "c:H:w:" "t:S::s::" "a::n:u:")) != -1)
 	{
 		switch (c)
 		{
@@ -93,15 +91,22 @@ int main(int argc, char* argv[])
 	if (file.good())
 	{
 		file >> config;
-		std::cout << "config="<<config.toStyledString()<< std::endl;
+		// std::cout << "config="<<config.toStyledString()<< std::endl;
 
 	} else {
 		std::cout << "No config... using defaults"<< std::endl;
 
 		config["turnurl"] = turnurl;
 		config["stunurl"] = stunurl;
+		Json::Value httpOptions;
+		httpOptions["listening_ports"] = defaultPort;
+
+		config["httpOptions"] = httpOptions;
 	}
 
+	// allow override of authKey from cmd line
+	if (!authKey.empty())
+		config["authKey"] = authKey;
 
 	// webrtc server
 	PeerConnectionManager webRtcServer(config, audioLayer);
@@ -111,6 +116,16 @@ int main(int argc, char* argv[])
 	}
 	else
 	{
+
+		if (!config["fps"].empty())
+		{
+			int fps = config["fps"].asInt();
+			webRtcServer.setFPS(fps);
+
+		}
+		std::cout << "fps="<< webRtcServer.getFPS() << std::endl;
+
+
 
 		// http server
 
@@ -130,45 +145,17 @@ int main(int argc, char* argv[])
 				options.push_back(value.asString());
 			} else
 			{
-				std::cout << "skip httpOptions:" << key.asString() << "=" <<value.asString() <<std::endl;
+				std::cout << "warning: skip httpOption:" << key.asString() << "=" <<value.asString() <<std::endl;
 			}
 		}
 
-#if 0
-		if (config["document_root"])
-		{
-			options.push_back("document_root");
-			options.push_back(config["document_root"].asString());
-		}
-		if (config["ssl_certificate"])
-		{
-			options.push_back("ssl_certificate");
-			options.push_back(config["ssl_certificate"].asString());
-		}
-
-		options.push_back("listening_ports");
-		options.push_back(httpAddress);
-
-		options.push_back("access_control_allow_origin");
-		options.push_back("*");
-
-		if (test)
-		{
-			options.push_back("document_root");
-			options.push_back("./html");
-			#if 0
-			webRtcServer.addStream("Test", "rtsp://video:only@bhlowe.com/cam/realmonitor?channel=1&subtype=1", "");
-			#endif
-			std::cout << "Starting in test mode.. adding test stream and using .html";
-		}
-
-#endif
 
 		try {
-			std::cout << "HTTP Listen at " << httpAddress << std::endl;
-			HttpServerRequestHandler httpServer(&webRtcServer, options, authKey);
 
+			HttpServerRequestHandler httpServer(&webRtcServer, options, authKey);
 			// start STUN server if needed
+
+			// TODO Check stun/turn
 			std::unique_ptr<cricket::StunServer> stunserver;
 			if (localstunurl != NULL)
 			{

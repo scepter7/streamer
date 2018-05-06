@@ -285,6 +285,7 @@ class PeerConnectionManager {
 			Json::Value iceCandidateList_;
 			rtc::scoped_refptr<PeerConnectionStatsCollectorCallback> m_statsCallback;
 			std::unique_ptr<VideoSink>                               m_videosink;
+
 	};
 
 	public:
@@ -312,6 +313,7 @@ class PeerConnectionManager {
 	protected:
 		const Json::Value & _config;
 
+		int fps;	//  = 25;
 
 		PeerConnectionObserver*                 CreatePeerConnection(const std::string& peerid);
 		// bool                                    AddStream(webrtc::PeerConnectionInterface* peer_connection, const std::string & streamID, const std::string & options);
@@ -335,7 +337,6 @@ class PeerConnectionManager {
 		void closeStream(rtc::scoped_refptr<PeerConnectionManager::RTSPStream> stream);
 
 		rtc::scoped_refptr<PeerConnectionManager::RTSPStream> getStream(const std::string & id);
-
 
 		bool  				streamStillUsed(const std::string & id);
 
@@ -379,6 +380,9 @@ class PeerConnectionManager {
 		static  const Json::Value error(const std::string &err);
 		virtual const Json::Value test();
 		static const Json::Value success();
+
+		int getFPS() { return fps; }
+		void  setFPS(int f) { fps = f; }
 
 };
 

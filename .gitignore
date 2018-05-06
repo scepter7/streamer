@@ -1,4 +1,4 @@
-src/*.o
+*.o
 *.tgz
 streamer
 .remote-sync.json
@@ -15,5 +15,8 @@ libWebRTC__*
 out
 cscope.out
 live555
+live555helper/*.sh
+live555helper/*.txt
 *.gch
-
+.gdbinit
+prod.json
